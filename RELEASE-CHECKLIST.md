@@ -1,13 +1,13 @@
-# Release verification — PersonalKiosk 1.1.0
+# Release verification — PersonalKiosk 1.2.0
 
 Status: packaged release candidate; NOT certified for unrestricted distribution.
 
 ## Completed
 
 - Self-contained Windows x64 release build.
-- 70 automated checks: existing password, persistence, USB/file and executable policies, plus schedule boundaries, selected weekdays, overnight windows, login/wake catch-up, overlaps, handled occurrence persistence, clock rollback, future weeks, startup policy, validation and legacy migration. Bar-Ilan name recognition and executable detection use inert fixture files, not an installed copy.
-- The self-contained 1.1.0 installer executable also completed all 70 checks with exit code 0. Extraction was redirected into a writable build directory.
-- The previous 1.0.0 home/installer screens were inspected without activating or installing the kiosk. Launching the new scheduling UI preview for inspection timed out at the computer-use approval step; no new visual inspection is claimed.
+- 115 automated checks pass, including from the self-contained installer executable. They cover existing kiosk policies, weekly scheduling and migration, notification boundaries/history, overnight app availability, optional hint persistence, version/channel selection, trusted release URLs, bounded metadata transport, network failure handling and branding. Bar-Ilan discovery uses inert fixtures, not an installed copy.
+- A real public GitHub metadata request through the application's updater succeeded: the current 1.2.0-rc.1 build identified v1.1.0-rc.1 as older, not an update. The probe writes a report only; no settings or startup registration are changed.
+- Home, scheduling and app-availability layouts were rendered off-screen in WPF and visually inspected. This does not replace live desktop interaction checks. The prior 1.0.0 home/installer UI was inspected without activating or installing the kiosk.
 - Runtime package vulnerability advisory lookup was unavailable because the NuGet service could not be reached. Compilation and local checks passed; no successful online vulnerability audit is claimed.
 - No live kiosk activation, registry startup changes or installation performed on the owner's desktop during development.
 
@@ -28,6 +28,10 @@ Status: packaged release candidate; NOT certified for unrestricted distribution.
 - [ ] Verify real timed activation, password exit mid-window, overlapping/overnight entries, sleep/wake, login catch-up and disabled schedules on Windows 10/11.
 - [ ] Check spring-forward/fall-back transitions in the target Windows time zone; verify no duplicate activation of a handled date.
 - [ ] Verify Bar-Ilan discovery and launch with real installations, including different versions and non-default install folders.
+- [ ] Verify advance and final-minute notices on the real desktop, dismissal without delaying activation and persistence after restart.
+- [ ] Verify active app windows minimize when availability ends, can be used again in the next window, and documents remain open.
+- [ ] Verify automatic and manual update UI with a newer release, stable/prerelease filtering, offline failure and browser download link; no automatic installation.
+- [ ] Verify hint reveal, hint removal, password change and all creator/homepage placements in the installed app.
 - [ ] Verify elevated/secure Windows UI limitations are visible to operator.
 - [ ] Review with owner that approved app dialogs can expose personal files; same-account protection remains partial.
 - [ ] Sign executable with publisher certificate, rebuild checksums, review bundled runtime notices, then distribute publicly.

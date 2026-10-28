@@ -24,6 +24,7 @@ if (!$PackageOnly) {
 Copy-Item -LiteralPath (Join-Path $publishPath 'PersonalKiosk.exe') -Destination (Join-Path $releasePath 'PersonalKioskSetup.exe') -Force
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'RELEASE-CHECKLIST.md') -Destination $releasePath -Force
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'מדריך למשתמש.md') -Destination $releasePath -Force
+Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'LICENSE.txt') -Destination $releasePath -Force
 foreach ($notice in Get-ChildItem -LiteralPath (Join-Path $PSScriptRoot 'PersonalKiosk\Resources') -File) { Copy-Item -LiteralPath $notice.FullName -Destination $releasePath -Force }
 
 $htmlBody = [System.Text.StringBuilder]::new()
@@ -31,6 +32,7 @@ foreach ($line in Get-Content -LiteralPath (Join-Path $PSScriptRoot 'מדריך 
     $encoded = [System.Net.WebUtility]::HtmlEncode($line)
     $encoded = [regex]::Replace($encoded, '`([^`]+)`', '<code dir="ltr">$1</code>')
     $encoded = [regex]::Replace($encoded, '\*\*([^*]+)\*\*', '<strong>$1</strong>')
+    $encoded = [regex]::Replace($encoded, 'https://[A-Za-z0-9./_?=&;%#:+~-]+', '<a href="$0" target="_blank" rel="noopener noreferrer">$0</a>')
     if ($line.StartsWith('## ')) { [void]$htmlBody.AppendLine('<h2>' + $encoded.Substring(3) + '</h2>') }
     elseif ($line.StartsWith('# ')) { [void]$htmlBody.AppendLine('<h1>' + $encoded.Substring(2) + '</h1>') }
     elseif ($line.Trim().Length -gt 0) { [void]$htmlBody.AppendLine('<p>' + $encoded + '</p>') }
@@ -46,7 +48,7 @@ $hashLines = foreach ($file in Get-ChildItem -LiteralPath $releasePath -File | W
 [System.IO.File]::WriteAllLines((Join-Path $releasePath 'SHA256SUMS.txt'), $hashLines)
 Compress-Archive -LiteralPath $releasePath -DestinationPath (Join-Path $distPath "PersonalKiosk-$version-win-x64.zip") -Force
 
-$sourceFiles = @((Join-Path $PSScriptRoot 'PersonalKiosk'), (Join-Path $PSScriptRoot 'build.ps1'), (Join-Path $PSScriptRoot 'README.md'), (Join-Path $PSScriptRoot 'מדריך למשתמש.md'), (Join-Path $PSScriptRoot 'RELEASE-CHECKLIST.md'))
+$sourceFiles = @((Join-Path $PSScriptRoot 'PersonalKiosk'), (Join-Path $PSScriptRoot 'build.ps1'), (Join-Path $PSScriptRoot 'README.md'), (Join-Path $PSScriptRoot 'LICENSE.txt'), (Join-Path $PSScriptRoot 'מדריך למשתמש.md'), (Join-Path $PSScriptRoot 'RELEASE-CHECKLIST.md'))
 $sourceZip = Join-Path $distPath "PersonalKiosk-$version-source.zip"
 # Add only source files; bin/obj and machine-specific state are never packaged.
 Add-Type -AssemblyName System.IO.Compression

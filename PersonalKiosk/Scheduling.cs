@@ -15,6 +15,8 @@ public sealed class WeeklySchedule
     public string End { get; set; } = "13:00";
     public List<int> Days { get; set; } = new() { 0, 1, 2, 3, 4 };
     public string LastHandledDate { get; set; } = "";
+    public string LastAdvanceNoticeDate { get; set; } = "";
+    public string LastMinuteNoticeDate { get; set; } = "";
 }
 
 public readonly record struct ScheduleOccurrence(WeeklySchedule Schedule, string StartDate);
@@ -25,8 +27,14 @@ public static class SchedulePolicy
     public static void Validate(Settings settings)
     {
         if (settings.Schedules == null || settings.Schedules.Any(s => s == null)) throw new IOException("רשימת הזמנים אינה תקינה.");
+        ValidateWindows(settings.Schedules);
+        if (HasSchedule(settings) && string.IsNullOrEmpty(settings.PasswordHash)) throw new IOException("יש להגדיר סיסמה לפני הפעלת לוח הזמנים.");
+        if (settings.ScheduleEnabled && !settings.Schedules.Any(s => s.Enabled)) throw new IOException("יש להוסיף לפחות סדר פעיל או לכבות את לוח הזמנים.");
+    }
+    public static void ValidateWindows(IEnumerable<WeeklySchedule> windows)
+    {
         var ids = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var schedule in settings.Schedules)
+        foreach (var schedule in windows)
         {
             if (string.IsNullOrWhiteSpace(schedule.Id) || !ids.Add(schedule.Id) || string.IsNullOrWhiteSpace(schedule.Name)) throw new IOException("לכל סדר נדרשים שם ומזהה נפרדים.");
             if (!TimeOnly.TryParseExact(schedule.Start, "HH:mm", CultureInfo.InvariantCulture, DateTimeStyles.None, out var start) ||
@@ -34,8 +42,6 @@ public static class SchedulePolicy
             if (schedule.Days == null || schedule.Days.Count == 0 || schedule.Days.Any(d => d < 0 || d > 6)) throw new IOException("יש לבחור לפחות יום אחד לכל סדר.");
             if (!string.IsNullOrEmpty(schedule.LastHandledDate) && !DateOnly.TryParseExact(schedule.LastHandledDate, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out _)) throw new IOException("נתוני ההפעלה האחרונה אינם תקינים.");
         }
-        if (HasSchedule(settings) && string.IsNullOrEmpty(settings.PasswordHash)) throw new IOException("יש להגדיר סיסמה לפני הפעלת לוח הזמנים.");
-        if (settings.ScheduleEnabled && !settings.Schedules.Any(s => s.Enabled)) throw new IOException("יש להוסיף לפחות סדר פעיל או לכבות את לוח הזמנים.");
     }
     // Pure wall-clock calculation: the caller supplies local time. An overnight entry
     // belongs to its START day, and the end is exclusive. No automatic password bypass.

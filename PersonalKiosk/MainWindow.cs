@@ -4,6 +4,8 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Interop;
@@ -29,6 +31,14 @@ internal sealed class MainWindow : Window
     private Forms.NotifyIcon? tray;
     private string scheduleError = "";
     private DateTime retryScheduleAfter;
+    private readonly DispatcherTimer updateTimer = new() { Interval = TimeSpan.FromHours(1) };
+    private readonly CancellationTokenSource updateCancellation = new();
+    private DateTimeOffset? lastUpdateAttempt;
+    private bool updateBusy;
+    private string updateStatus = "";
+    private string availabilitySignature = "";
+    private NoticeWindow? noticeWindow;
+    private DateTime retryNoticeAfter;
     internal MainWindow(Store store, Settings settings, bool preview = false, bool backgroundStart = false)
     {
         this.store = store; this.settings = settings; this.preview = preview; this.backgroundStart = backgroundStart;
@@ -43,17 +53,19 @@ internal sealed class MainWindow : Window
             UpdateResidentMode();
             if (settings.KioskActive) Enter(true);
             else if (this.backgroundStart && SchedulePolicy.HasSchedule(settings)) { ShowInTaskbar = false; Hide(); }
-            ScheduleTick();
+            MaintenanceTick(); _ = CheckUpdatesAsync(false);
         };
-        scheduleTimer.Tick += (_, _) => ScheduleTick();
+        scheduleTimer.Tick += (_, _) => MaintenanceTick();
+        updateTimer.Tick += (_, _) => { _ = CheckUpdatesAsync(false); };
         SystemEvents.DisplaySettingsChanged += DisplaysChanged;
-        Closed += (_, _) => { SystemEvents.DisplaySettingsChanged -= DisplaysChanged; scheduleTimer.Stop(); tray?.Dispose(); guard?.Dispose(); CloseShields(); };
+        Closed += (_, _) => { SystemEvents.DisplaySettingsChanged -= DisplaysChanged; scheduleTimer.Stop(); updateTimer.Stop(); updateCancellation.Cancel(); noticeWindow?.Close(); tray?.Dispose(); guard?.Dispose(); CloseShields(); };
     }
-    internal void Reload(Settings updated) { settings = updated; scheduleError = ""; UpdateResidentMode(); Build(); Dispatcher.BeginInvoke(ScheduleTick); }
+    internal void Reload(Settings updated) { bool channelChanged = settings.IncludePrereleaseUpdates != updated.IncludePrereleaseUpdates; settings = updated; if (channelChanged) { lastUpdateAttempt = null; updateStatus = ""; } scheduleError = ""; UpdateResidentMode(); Build(); Dispatcher.BeginInvoke(MaintenanceTick); _ = CheckUpdatesAsync(false); }
     private void UpdateResidentMode()
     {
         if (preview) return;
-        scheduleTimer.Stop();
+        scheduleTimer.Start();
+        if (settings.AutoCheckUpdates) updateTimer.Start(); else updateTimer.Stop();
         if (SchedulePolicy.HasSchedule(settings))
         {
             if (tray == null)
@@ -64,9 +76,79 @@ internal sealed class MainWindow : Window
                 menu.Items.Add("סגירת התוכנה", null, (_, _) => Dispatcher.BeginInvoke(QuitResident));
                 tray.ContextMenuStrip = menu; tray.DoubleClick += (_, _) => Dispatcher.BeginInvoke(ShowMain);
             }
-            tray.Visible = true; scheduleTimer.Start();
+            tray.Visible = true;
         }
         else if (tray != null) { tray.Visible = false; }
+    }
+    private string AvailabilitySignature() => string.Join(";", settings.Apps.Select(a => a.Id + ":" + FeaturePolicy.Available(a, DateTime.Now)));
+    private void MaintenanceTick()
+    {
+        if (preview || sessionEnding) return;
+        bool dialogOpen = OwnedWindows.Cast<Window>().Any(w => w.IsVisible);
+        if (active && !dialogOpen && availabilitySignature != AvailabilitySignature()) Build();
+        if (!active && !transition && !prompting && !dialogOpen && DateTime.UtcNow >= retryNoticeAfter)
+        {
+            var notices = NoticePolicy.Pending(settings, DateTime.Now);
+            if (notices.Count != 0)
+            {
+                var prior = notices.Select(n => (n.Schedule, n.Schedule.LastAdvanceNoticeDate, n.Schedule.LastMinuteNoticeDate)).ToList();
+                try
+                {
+                    foreach (var notice in notices) notice.MarkShown();
+                    store.Save(settings); noticeWindow?.Close(); noticeWindow = new NoticeWindow(notices); noticeWindow.Show();
+                }
+                catch (Exception ex)
+                {
+                    foreach (var (schedule, advance, final) in prior) { schedule.LastAdvanceNoticeDate = advance; schedule.LastMinuteNoticeDate = final; }
+                    scheduleError = "לא ניתן להציג התראה: " + ex.Message; retryNoticeAfter = DateTime.UtcNow.AddMinutes(1);
+                }
+            }
+        }
+        ScheduleTick();
+    }
+    private bool HasUpdate => UpdatePolicy.TrustedReleaseUrl(settings.LatestUpdateUrl) && UpdatePolicy.Newer(settings.LatestUpdateTag, BuildInfo.ReleaseVersion) && (settings.IncludePrereleaseUpdates || (ReleaseNumber.TryParse(settings.LatestUpdateTag, out var version) && !version.IsPrerelease));
+    private async Task CheckUpdatesAsync(bool manual)
+    {
+        if (preview || updateBusy || sessionEnding || updateCancellation.IsCancellationRequested) return;
+        var now = DateTimeOffset.UtcNow;
+        if (!manual && (!settings.AutoCheckUpdates || !UpdatePolicy.CheckDue(settings.LastUpdateCheckUtc, now) || (lastUpdateAttempt.HasValue && now - lastUpdateAttempt.Value < TimeSpan.FromHours(1)))) return;
+        updateBusy = true; lastUpdateAttempt = now; updateStatus = "בודק עדכונים…";
+        bool channel = settings.IncludePrereleaseUpdates;
+        try
+        {
+            var result = await UpdatePolicy.FetchAsync(channel, token: updateCancellation.Token);
+            if (updateCancellation.IsCancellationRequested) return;
+            if (channel != settings.IncludePrereleaseUpdates) { lastUpdateAttempt = null; updateStatus = "ערוץ העדכונים השתנה. יש לבדוק שוב."; return; }
+            var old = (settings.LastUpdateCheckUtc, settings.LatestUpdateTag, settings.LatestUpdateUrl);
+            settings.LastUpdateCheckUtc = DateTimeOffset.UtcNow; settings.LatestUpdateTag = result?.Tag ?? ""; settings.LatestUpdateUrl = result?.Url ?? "";
+            try { store.Save(settings); }
+            catch { (settings.LastUpdateCheckUtc, settings.LatestUpdateTag, settings.LatestUpdateUrl) = old; throw; }
+            updateStatus = HasUpdate ? "זמינה גרסה חדשה: " + settings.LatestUpdateTag : result == null ? "לא נמצאה מהדורה מתאימה בערוץ שנבחר." : "לא נמצאה גרסה חדשה יותר.";
+        }
+        catch (OperationCanceledException) { if (!updateCancellation.IsCancellationRequested) updateStatus = "הבדיקה ארכה זמן רב מדי. ניתן לנסות שוב."; }
+        catch (Exception) { updateStatus = "בדיקת העדכונים לא הושלמה. יש לבדוק את החיבור ולנסות שוב."; }
+        finally
+        {
+            updateBusy = false;
+            if (!updateCancellation.IsCancellationRequested && !Dispatcher.HasShutdownStarted && IsVisible && !OwnedWindows.Cast<Window>().Any(w => w.IsVisible)) Build();
+        }
+    }
+    private void ShowUpdates()
+    {
+        if (active) return;
+        var window = Ui.Dialog(this, "עדכוני קיוסק אישי", 580, 480); var panel = new StackPanel { Margin = new Thickness(24) };
+        panel.Children.Add(Ui.Text("עדכונים", 28)); panel.Children.Add(Ui.Text("הגרסה המותקנת: " + BuildInfo.ReleaseVersion, 15));
+        var status = Ui.Text("", 15);
+        panel.Children.Add(status);
+        var download = Ui.Button("פתיחת דף ההורדה", () => { try { if (HasUpdate) Brand.OpenLink(settings.LatestUpdateUrl); } catch (Exception ex) { Ui.Message(window, "לא ניתן לפתוח", ex.Message); } }, true);
+        void Refresh() { status.Text = updateBusy ? "בודק עדכונים…" : !string.IsNullOrEmpty(updateStatus) ? updateStatus : HasUpdate ? "זמינה גרסה חדשה: " + settings.LatestUpdateTag : settings.LastUpdateCheckUtc.HasValue ? "בדיקה אחרונה: " + settings.LastUpdateCheckUtc.Value.ToLocalTime().ToString("dd/MM/yyyy HH:mm") : "עדיין לא בוצעה בדיקת עדכונים."; download.Visibility = HasUpdate ? Visibility.Visible : Visibility.Collapsed; }
+        var check = new Button { Content = "בדיקה כעת" };
+        check.Click += async (_, _) => { check.IsEnabled = false; status.Text = "בודק עדכונים…"; await CheckUpdatesAsync(true); Refresh(); check.IsEnabled = true; };
+        panel.Children.Add(check); panel.Children.Add(download);
+        panel.Children.Add(Ui.Text("הבדיקה קוראת פרטי מהדורות מ־GitHub. ההתקנה ידנית בלבד. עדיף לצאת מהקיוסק ולסגור את התוכנה לפני התקנת עדכון.", 13, Ui.Muted));
+        panel.Children.Add(Ui.Button("סגירה", window.Close));
+        var timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) }; timer.Tick += (_, _) => Refresh(); window.Closed += (_, _) => timer.Stop(); timer.Start(); Refresh();
+        window.Content = new ScrollViewer { Content = panel }; window.ShowDialog();
     }
     internal void ShowMain() { ShowInTaskbar = true; Show(); if (WindowState == WindowState.Minimized) WindowState = WindowState.Normal; Activate(); if (active) Home(); }
     private void QuitResident()
@@ -109,10 +191,12 @@ internal sealed class MainWindow : Window
     private void Build()
     {
         var outer = new DockPanel { Margin = new Thickness(36, 22, 36, 22) };
+        availabilitySignature = AvailabilitySignature();
         var header = new DockPanel(); DockPanel.SetDock(header, Dock.Top); outer.Children.Add(header);
         var badge = new Border { Background = active ? new SolidColorBrush(Color.FromRgb(220, 240, 234)) : Brushes.White, CornerRadius = new CornerRadius(20), Padding = new Thickness(18, 7, 18, 7), VerticalAlignment = VerticalAlignment.Center, Child = Ui.Text(!string.IsNullOrEmpty(fault) ? "תקלה בחסימה" : active ? "●  הקיוסק פעיל" : preview ? "תצוגה מקדימה · ללא חסימה" : "○  המחשב במצב רגיל", 13, !string.IsNullOrEmpty(fault) ? Brushes.Firebrick : active ? Ui.Accent : Ui.Muted) };
         DockPanel.SetDock(badge, Dock.Left); header.Children.Add(badge);
         var title = new StackPanel(); title.Children.Add(Ui.Text("קיוסק אישי", 34)); title.Children.Add(Ui.Text(active ? "סביבת עבודה פשוטה. כל מה שצריך, במקום אחד." : "בוחרים תוכנות. מפעילים. עובדים בראש שקט.", 15, Ui.Muted)); header.Children.Add(title);
+        var brand = Ui.BrandFooter(this, !active); DockPanel.SetDock(brand, Dock.Bottom); outer.Children.Add(brand);
         var footer = new DockPanel { Margin = new Thickness(0, 18, 0, 0) }; DockPanel.SetDock(footer, Dock.Bottom); outer.Children.Add(footer);
         var controls = new WrapPanel(); DockPanel.SetDock(controls, Dock.Right); footer.Children.Add(controls);
         if (active) controls.Children.Add(Ui.Button("יציאה מהקיוסק", Exit, true));
@@ -128,8 +212,10 @@ internal sealed class MainWindow : Window
             }));
         }
         controls.Children.Add(Ui.Button("מידע ועזרה", Help));
+        if (!active) controls.Children.Add(Ui.Button("עדכונים", ShowUpdates));
         footer.Children.Add(Ui.Text(active ? "חזרה לבית הקיוסק: Ctrl + Alt + Home" : "גרסה " + BuildInfo.Version + "  ·  Windows 10 / 11", 12, Ui.Muted));
         var body = new StackPanel();
+        if (!active && HasUpdate) body.Children.Add(Ui.Card(Ui.Button("זמינה גרסה חדשה: " + settings.LatestUpdateTag + " — לפרטים ולהורדה", ShowUpdates)));
         if (!string.IsNullOrEmpty(scheduleError)) body.Children.Add(Ui.Card(Ui.Text(scheduleError, 15, Brushes.Firebrick)));
         if (!active && SchedulePolicy.HasSchedule(settings))
         {
@@ -142,9 +228,10 @@ internal sealed class MainWindow : Window
         var apps = new WrapPanel();
         foreach (var app in settings.Apps)
         {
+            bool available = !active || FeaturePolicy.Available(app, DateTime.Now);
             var card = new StackPanel(); card.Children.Add(Ui.Text(app.Name.EndsWith("Word") ? "W" : app.Extensions.Contains(".pdf") ? "PDF" : app.Name == "פנקס רשימות" ? "Aa" : "▤", 28, Ui.Accent));
-            card.Children.Add(Ui.Text(app.Name, 18)); card.Children.Add(Ui.Text(File.Exists(app.Path) ? active ? "פתיחת התוכנה  ←" : "מוכנה לשימוש" : "קובץ התוכנה לא נמצא", 12, Ui.Muted));
-            var button = Ui.Button("", () => { if (active) Launch(app); }); button.Content = card; button.Width = 218; button.Height = 154; button.HorizontalContentAlignment = HorizontalAlignment.Stretch; button.IsEnabled = File.Exists(app.Path); System.Windows.Automation.AutomationProperties.SetName(button, app.Name); apps.Children.Add(button);
+            card.Children.Add(Ui.Text(app.Name, 18)); card.Children.Add(Ui.Text(!available ? "אינה זמינה בשעה זו" : File.Exists(app.Path) ? active ? "פתיחת התוכנה  ←" : "מוכנה לשימוש" : "קובץ התוכנה לא נמצא", 12, Ui.Muted));
+            var button = Ui.Button("", () => { if (active) Launch(app); }); button.Content = card; button.Width = 218; button.Height = 154; button.HorizontalContentAlignment = HorizontalAlignment.Stretch; button.IsEnabled = File.Exists(app.Path) && available; System.Windows.Automation.AutomationProperties.SetName(button, app.Name); apps.Children.Add(button);
         }
         body.Children.Add(apps);
         if (settings.Apps.Count == 0) body.Children.Add(Ui.Text("עדיין אין תוכנות ברשימה. יש להוסיף תוכנות דרך ההגדרות."));
@@ -182,6 +269,7 @@ internal sealed class MainWindow : Window
                 if (consent.ShowDialog() != true) return;
             }
             if (settings.Apps.Count == 0 || string.IsNullOrEmpty(settings.PasswordHash)) throw new IOException("יש להגדיר סיסמה ולפחות תוכנה אחת לפני ההפעלה.");
+            noticeWindow?.Close();
             normalBounds = new Rect(Left, Top, ActualWidth, ActualHeight);
             Startup.Enable(); settings.KioskActive = true; SchedulePolicy.MarkCurrentHandled(settings, DateTime.Now); store.Save(settings);
             active = true; WindowState = WindowState.Normal; WindowStyle = WindowStyle.None; ResizeMode = ResizeMode.NoResize;
@@ -232,6 +320,7 @@ internal sealed class MainWindow : Window
         try
         {
             if (!File.Exists(app.Path)) throw new IOException("קובץ התוכנה לא נמצא. יש לעדכן אותו בהגדרות לאחר היציאה.");
+            if (active && !FeaturePolicy.Available(app, DateTime.Now)) throw new IOException("התוכנה אינה זמינה בשעה זו לפי ההגדרות.");
             LowerShields();
             using var process = file == null ? Startup.Launch(app.Path) : Startup.Launch(app.Path, file);
         }

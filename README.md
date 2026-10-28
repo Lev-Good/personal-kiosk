@@ -1,5 +1,9 @@
 # PersonalKiosk / קיוסק אישי
 
+Created by **לב טוב דיגיטל**. © 2026 לב טוב דיגיטל. כל הזכויות שמורות.
+
+[אתר הבית — תוכנות חינמיות נוספות](https://digital.levtov.uk/index.html). Original code/content rights are reserved; bundled third-party runtime licenses remain in effect.
+
 Local Windows desktop kiosk in C# / WPF. Same-account, casual-use restriction; no separate Windows account, service, driver, internet filtering or OS security policy changes.
 
 ## Build
@@ -8,10 +12,10 @@ Requires Windows x64 and .NET SDK 10. Run `pwsh -File ./build.ps1` from this dir
 
 Outputs in `dist/`:
 
-- `PersonalKiosk-1.1.0-win-x64/PersonalKioskSetup.exe`: per-user installer. Installer mode is selected by this exact filename or `--install`.
+- `PersonalKiosk-1.2.0-win-x64/PersonalKioskSetup.exe`: per-user installer. Installer mode is selected by this exact filename or `--install`.
 - `app/PersonalKiosk.exe`: portable application.
-- `PersonalKiosk-1.1.0-win-x64.zip`: distribution candidate, guide, licenses, test results and checksums.
-- `PersonalKiosk-1.1.0-source.zip`: source-only archive, without settings or build output.
+- `PersonalKiosk-1.2.0-win-x64.zip`: distribution candidate, guide, licenses, test results and checksums.
+- `PersonalKiosk-1.2.0-source.zip`: source-only archive, without settings or build output.
 
 The portable executable must stay at the same path while the kiosk is active; the startup registration and watchdog refer to that path. Installation places it under `%LOCALAPPDATA%\Programs\PersonalKiosk`.
 
@@ -24,6 +28,8 @@ The portable executable must stay at the same path while the kiosk is active; th
 - `--preview-schedule`: display sample schedule settings entirely in memory; no startup registration, password or persisted settings changes. A copy named `PersonalKioskSchedulePreview.exe` opens the same preview.
 - `--watch <pid>`: internal watchdog process, monitors the UI process and relaunches an active kiosk after unexpected exit.
 - `--install` / `--uninstall`: interactive per-user deployment.
+- `--render-previews <directory>`: off-screen WPF layout renders, without showing windows, loading settings, making update requests or activating the kiosk.
+- `--probe-updates <report-path>`: one explicit public GitHub metadata request and a JSON report, without changing settings or launching the GUI.
 
 ## Implementation
 
@@ -38,6 +44,14 @@ When schedules are enabled, the normal Close button hides to a tray icon and HKC
 `Guard.cs` / `Native.cs`: keyboard hook, 200 ms window checks, common dialog gating, path-based executable approval, USB bus detection. Window overlays cover all attached displays. Unapproved visible top-level windows with titles are minimized and restored on exit; no processes are killed.
 
 `MainWindow.cs` / `Ui.cs`: Hebrew RTL UI, settings and USB document browser. `InstallerWindow.cs`: installer and narrowly scoped uninstall script. `SelfTest.cs`: automated checks.
+
+## Version 1.2 features
+
+- `Features.cs` / `NoticeWindow.cs`: configurable 1–60-minute advance notice (5 by default), plus a final-minute notice. Persistent per-occurrence history avoids repeat notifications; entering inside the final minute does not show two notices. Non-modal windows do not block scheduled entry. Notice failures have their own cooldown and do not suppress activation retries.
+- Each allowed app has optional weekly availability windows. Launch buttons, USB app selection and the guard all apply the same current-time policy. At expiry, visible windows are minimized rather than processes killed; background activity can continue. The restriction applies only during active kiosk mode.
+- `Updates.cs`: automatic public GitHub releases metadata check, at most once per successful 24-hour interval while running, with one-hour failure cooldown and a manual check. Stable/prerelease channel selection, semantic-version ordering including RC numbers, bounded 2 MiB responses, 15-second timeout, trusted repository URLs and uploaded installer checks. No credentials or settings are sent and nothing is installed automatically. Reference: [GitHub Releases API](https://docs.github.com/en/rest/releases/releases#list-releases).
+- Optional 200-character plain-text password hint, revealed only on request. It never unlocks/resets the password; the UI refuses a hint equal to the password.
+- Creator/copyright/homepage attribution in the app, installer, Windows publisher metadata and embedded rights notice. Runtime licenses are retained.
 
 ## Boundaries and release status
 

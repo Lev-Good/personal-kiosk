@@ -27,6 +27,7 @@ internal sealed class InstallerWindow : Window
         status = Ui.Text("", 14); p.Children.Add(status);
         install = Ui.Button(uninstall ? "הסרת התוכנה" : "התקנה", () => { if (uninstall) Uninstall(); else Install(); }, true); p.Children.Add(install);
         p.Children.Add(Ui.Button("סגירה", Close)); Content = new ScrollViewer { Content = p };
+        p.Children.Add(Ui.BrandFooter(this));
     }
     private void Install()
     {
@@ -35,7 +36,7 @@ internal sealed class InstallerWindow : Window
             if (!Environment.Is64BitOperatingSystem) throw new IOException("גרסה זו מיועדת למערכת Windows של 64 סיביות.");
             Directory.CreateDirectory(InstallDir);
             if (!Policy.SamePath(Environment.ProcessPath!, InstalledExe)) File.Copy(Environment.ProcessPath!, InstalledExe, true);
-            foreach (var file in new[] { "RuntimeLicense.txt", "RuntimeNotices.txt", "DesktopLicense.txt", "Guide.md" })
+            foreach (var file in new[] { "RuntimeLicense.txt", "RuntimeNotices.txt", "DesktopLicense.txt", "Rights.txt", "Guide.md" })
             {
                 using var resource = System.Reflection.Assembly.GetExecutingAssembly().GetManifestResourceStream("PersonalKiosk.Resources." + file) ?? throw new IOException("משאב התקנה חסר: " + file);
                 using var target = File.Create(Path.Combine(InstallDir, file)); resource.CopyTo(target);
@@ -44,7 +45,7 @@ internal sealed class InstallerWindow : Window
             var menu = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Programs), "קיוסק אישי"); Directory.CreateDirectory(menu);
             Shortcut(Path.Combine(menu, "קיוסק אישי.lnk"), ""); Shortcut(Path.Combine(menu, "הסרת קיוסק אישי.lnk"), "--uninstall");
             using var key = Microsoft.Win32.Registry.CurrentUser.CreateSubKey(@"Software\Microsoft\Windows\CurrentVersion\Uninstall\PersonalKiosk");
-            key.SetValue("DisplayName", "קיוסק אישי"); key.SetValue("DisplayVersion", BuildInfo.Version); key.SetValue("Publisher", "PersonalKiosk"); key.SetValue("InstallLocation", InstallDir); key.SetValue("UninstallString", "\"" + InstalledExe + "\" --uninstall"); key.SetValue("DisplayIcon", InstalledExe); key.SetValue("NoModify", 1); key.SetValue("NoRepair", 1);
+            key.SetValue("DisplayName", "קיוסק אישי"); key.SetValue("DisplayVersion", BuildInfo.Version); key.SetValue("Publisher", Brand.Owner); key.SetValue("URLInfoAbout", Brand.HomeUrl); key.SetValue("InstallLocation", InstallDir); key.SetValue("UninstallString", "\"" + InstalledExe + "\" --uninstall"); key.SetValue("DisplayIcon", InstalledExe); key.SetValue("NoModify", 1); key.SetValue("NoRepair", 1);
             status.Text = "ההתקנה הושלמה. אפשר לפתוח את התוכנה מקיצור הדרך בשולחן העבודה. מצב קיוסק לא הופעל.";
             install.IsEnabled = false;
         }
@@ -76,7 +77,7 @@ internal sealed class InstallerWindow : Window
                 "$expected = Join-Path ([Environment]::GetFolderPath('LocalApplicationData')) 'Programs\\PersonalKiosk'\n" +
                 "if ([IO.Path]::GetFullPath($target) -ne [IO.Path]::GetFullPath($expected)) { throw 'Unexpected target' }\n" +
                 "Remove-Item -LiteralPath (Join-Path $target 'PersonalKiosk.exe') -Force -ErrorAction SilentlyContinue\n" +
-                "foreach ($file in @('RuntimeLicense.txt','RuntimeNotices.txt','DesktopLicense.txt','Guide.md')) { Remove-Item -LiteralPath (Join-Path $target $file) -Force -ErrorAction SilentlyContinue }\n" +
+                "foreach ($file in @('RuntimeLicense.txt','RuntimeNotices.txt','DesktopLicense.txt','Rights.txt','Guide.md')) { Remove-Item -LiteralPath (Join-Path $target $file) -Force -ErrorAction SilentlyContinue }\n" +
                 "if ((Get-ChildItem -LiteralPath $target -Force | Measure-Object).Count -eq 0) { Remove-Item -LiteralPath $target -Force }\n" +
                 "Remove-Item -LiteralPath " + Quote(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), "קיוסק אישי.lnk")) + " -Force -ErrorAction SilentlyContinue\n" +
                 "Remove-Item -LiteralPath " + Quote(Path.Combine(menu, "קיוסק אישי.lnk")) + " -Force -ErrorAction SilentlyContinue\n" +

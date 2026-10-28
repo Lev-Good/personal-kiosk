@@ -43,7 +43,7 @@ internal sealed class Guard : IDisposable
         if (images.TryGetValue(pid, out var entry) && entry.Until > DateTime.UtcNow) return entry.Image;
         var image = Native.Image(pid); images[pid] = (image, DateTime.UtcNow.AddSeconds(1)); return image;
     }
-    private bool Allowed(uint pid) => pid == Environment.ProcessId || settings.Apps.Any(app => Policy.AllowedImage(app, Image(pid)));
+    private bool Allowed(uint pid) => pid == Environment.ProcessId || settings.Apps.Any(app => FeaturePolicy.Available(app, DateTime.Now) && Policy.AllowedImage(app, Image(pid)));
     private static bool Dialog(IntPtr hwnd)
     {
         var cls = Native.Class(hwnd);

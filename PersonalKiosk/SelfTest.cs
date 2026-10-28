@@ -2,6 +2,11 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Net;
+using System.Net.Http;
+using System.Threading;
+using System.Threading.Tasks;
+using System.Text.Json;
 
 namespace PersonalKiosk;
 
@@ -60,7 +65,7 @@ internal static class SelfTest
             Check("untrusted Notepad package rejected", () => !Policy.AllowedImage(notepad, Path.Combine(packages, "Microsoft.WindowsNotepad_11.0.0.0_x64__untrusted", "Notepad", "Notepad.exe")));
             Check("same filename outside configured path rejected", () => !Policy.AllowedImage(reader, Path.Combine(dir, Path.GetFileName(reader.Path))));
             Check("empty image is rejected", () => !Policy.AllowedImage(reader, ""));
-            Check("embedded installer resources exist", () => new[] { "RuntimeLicense.txt", "RuntimeNotices.txt", "DesktopLicense.txt", "Guide.md" }.All(file => System.Reflection.Assembly.GetExecutingAssembly().GetManifestResourceNames().Contains("PersonalKiosk.Resources." + file)));
+            Check("embedded installer resources exist", () => new[] { "RuntimeLicense.txt", "RuntimeNotices.txt", "DesktopLicense.txt", "Rights.txt", "Guide.md" }.All(file => System.Reflection.Assembly.GetExecutingAssembly().GetManifestResourceNames().Contains("PersonalKiosk.Resources." + file)));
             var seder = new WeeklySchedule { Name = "סדר א׳", Start = "09:00", End = "13:00", Days = new() { 0 } };
             var sunday = new DateTime(2026, 10, 25);
             var scheduled = new Settings { ScheduleEnabled = true, PasswordHash = settings.PasswordHash, Salt = settings.Salt, Schedules = new() { seder }, Apps = new() { reader } };
@@ -114,6 +119,66 @@ internal static class SelfTest
                 Check("absent Bar Ilan executable is not fabricated", () => ResponsaDiscovery.FindInFolders(new[] { Path.Combine(dir, "not-installed") }).Count == 0);
             }
             finally { foreach (var file in Directory.EnumerateFiles(responsaFolder)) File.Delete(file); Directory.Delete(responsaFolder); }
+            var warnings = new Settings { ScheduleEnabled = true, Schedules = new() { new WeeklySchedule { Start = "09:00", End = "13:00", Days = new() { 0 } } } };
+            Check("warning does not appear before lead time", () => NoticePolicy.Pending(warnings, sunday.AddHours(8).AddMinutes(54)).Count == 0);
+            Check("advance warning starts at configured lead time", () => NoticePolicy.Pending(warnings, sunday.AddHours(8).AddMinutes(55)).Single().FinalMinute == false);
+            NoticePolicy.Pending(warnings, sunday.AddHours(8).AddMinutes(55)).Single().MarkShown();
+            Check("advance warning not repeated", () => NoticePolicy.Pending(warnings, sunday.AddHours(8).AddMinutes(56)).Count == 0);
+            Check("last minute warning appears separately", () => NoticePolicy.Pending(warnings, sunday.AddHours(8).AddMinutes(59)).Single().FinalMinute);
+            NoticePolicy.Pending(warnings, sunday.AddHours(8).AddMinutes(59)).Single().MarkShown();
+            Check("last minute warning not repeated", () => NoticePolicy.Pending(warnings, sunday.AddHours(8).AddMinutes(59.5)).Count == 0);
+            Check("warning never replaces scheduled activation", () => NoticePolicy.Pending(warnings, sunday.AddHours(9)).Count == 0 && SchedulePolicy.Due(warnings, sunday.AddHours(9)).Count == 1);
+            Check("warning suppressed after handled occurrence", () => { warnings.Schedules[0].LastHandledDate = "2026-10-25"; warnings.Schedules[0].LastAdvanceNoticeDate = ""; return NoticePolicy.Pending(warnings, sunday.AddHours(8).AddMinutes(55)).Count == 0; });
+            warnings.Schedules[0].LastHandledDate = ""; warnings.ScheduleWarningsEnabled = false;
+            Check("warnings can be disabled without disabling schedule", () => NoticePolicy.Pending(warnings, sunday.AddHours(8).AddMinutes(59)).Count == 0 && SchedulePolicy.Due(warnings, sunday.AddHours(10)).Count == 1);
+            warnings.ScheduleWarningsEnabled = true; warnings.Schedules[0].Start = "00:02"; warnings.Schedules[0].End = "01:00"; warnings.Schedules[0].Days = new() { 1 };
+            Check("advance warning crosses midnight on correct start day", () => NoticePolicy.Pending(warnings, sunday.AddHours(23).AddMinutes(58)).Single().Date == "2026-10-26");
+            warnings.PasswordHash = settings.PasswordHash; warnings.Salt = settings.Salt;
+            NoticePolicy.Pending(warnings, sunday.AddHours(23).AddMinutes(58)).Single().MarkShown(); scheduledStore.Save(warnings);
+            Check("warning history survives restart", () => NoticePolicy.Pending(scheduledStore.Load(), sunday.AddHours(23).AddMinutes(59)).Count == 0);
+            var timedApp = new AllowedApp { Name = "Word", Path = reader.Path, TimeRestricted = true, Availability = new() { new WeeklySchedule { Start = "09:00", End = "13:00", Days = new() { 0 } } } };
+            Check("application unavailable before allowed hours", () => !FeaturePolicy.Available(timedApp, sunday.AddHours(8)));
+            Check("application availability start inclusive", () => FeaturePolicy.Available(timedApp, sunday.AddHours(9)));
+            Check("application availability end exclusive", () => !FeaturePolicy.Available(timedApp, sunday.AddHours(13)));
+            Check("application unavailable on unselected day", () => !FeaturePolicy.Available(timedApp, sunday.AddDays(1).AddHours(10)));
+            timedApp.Availability.Add(new WeeklySchedule { Start = "23:00", End = "01:00", Days = new() { 0 } });
+            Check("application availability supports overnight window", () => FeaturePolicy.Available(timedApp, sunday.AddDays(1).AddMinutes(30)));
+            Check("application remains blocked between windows", () => !FeaturePolicy.Available(timedApp, sunday.AddHours(20)));
+            Check("unrestricted apps remain available", () => FeaturePolicy.Available(reader, sunday.AddHours(3)));
+            Check("application restriction requires active window", () => { try { FeaturePolicy.Validate(new Settings { Apps = new() { new AllowedApp { TimeRestricted = true } } }); return false; } catch (IOException) { return true; } });
+            Check("availability does not depend on kiosk schedule master", () => FeaturePolicy.Available(timedApp, sunday.AddHours(10)) && !SchedulePolicy.HasSchedule(new Settings()));
+            Check("optional empty hint accepted", () => { FeaturePolicy.ValidateHint(settings, ""); return true; });
+            Check("hint cannot equal actual password", () => { try { FeaturePolicy.ValidateHint(settings, "sample-test-password"); return false; } catch (IOException) { return true; } });
+            Check("oversized hint rejected", () => { try { FeaturePolicy.ValidateHint(settings, new string('x', 201)); return false; } catch (IOException) { return true; } });
+            settings.PasswordHint = "רמז לבדיקה"; settings.Apps.Add(timedApp); store.Save(settings);
+            Check("hint and app availability persist", () => store.Load().PasswordHint == "רמז לבדיקה" && store.Load().Apps.Last().TimeRestricted && store.Load().Apps.Last().Availability.Count == 2);
+            Check("legacy settings retain unrestricted apps and empty hint", () => { var oldPath = Path.Combine(dir, "old-features.json"); File.WriteAllText(oldPath, JsonSerializer.Serialize(new { Version = 1, Apps = new[] { new { Name = "Reader", Path = reader.Path, Extensions = ".pdf" } } })); var legacy = new Store(oldPath).Load(); return legacy.PasswordHint == "" && !legacy.Apps[0].TimeRestricted && legacy.AutoCheckUpdates && legacy.ScheduleWarningsEnabled; });
+            Check("update numeric versions compare correctly", () => UpdatePolicy.Newer("v1.10.0", "1.9.9"));
+            Check("update RC numbers compare numerically", () => UpdatePolicy.Newer("v1.2.0-rc.10", "1.2.0-rc.2"));
+            Check("stable release supersedes its RC", () => UpdatePolicy.Newer("v1.2.0", "1.2.0-rc.1"));
+            Check("same version is not an update", () => !UpdatePolicy.Newer("v1.2.0-rc.1", "1.2.0-rc.1"));
+            Check("build metadata is ignored for precedence", () => !UpdatePolicy.Newer("1.2.0+new", "1.2.0+old"));
+            Check("older release never offered as downgrade", () => !UpdatePolicy.Newer("v1.1.0", "1.2.0-rc.1"));
+            Check("malformed release version rejected", () => !UpdatePolicy.Newer("1.02.0", "1.0.0") && !ReleaseNumber.TryParse("1.2.0-rc.01", out _));
+            Check("trusted GitHub release link accepted", () => UpdatePolicy.TrustedReleaseUrl("https://github.com/Lev-Good/personal-kiosk/releases/tag/v1.3.0"));
+            Check("untrusted update links rejected", () => !UpdatePolicy.TrustedReleaseUrl("https://github.com.evil.invalid/Lev-Good/personal-kiosk/releases/tag/v1.3.0") && !UpdatePolicy.TrustedReleaseUrl("http://github.com/Lev-Good/personal-kiosk/releases/tag/v1.3.0") && !UpdatePolicy.TrustedReleaseUrl("https://github.com/Other/repo/releases/tag/v1.3.0"));
+            string Release(string tag, bool pre = false, bool draft = false, string? url = null, bool installer = true) => JsonSerializer.Serialize(new { tag_name = tag, prerelease = pre, draft, html_url = url ?? "https://github.com/Lev-Good/personal-kiosk/releases/tag/" + tag, assets = installer ? new object[] { new { name = "PersonalKioskSetup.exe", state = "uploaded" } } : Array.Empty<object>() });
+            var releases = "[" + string.Join(',', new[] { Release("v1.3.0-rc.1", true), Release("v1.2.0"), Release("v9.0.0", draft: true), Release("v8.0.0", url: "https://evil.invalid/"), Release("v7.0.0", installer: false) }) + "]";
+            Check("updater selects highest permitted release", () => UpdatePolicy.SelectLatest(releases, true)?.Tag == "v1.3.0-rc.1");
+            Check("stable channel excludes prereleases", () => UpdatePolicy.SelectLatest(releases, false)?.Tag == "v1.2.0");
+            Check("mismatched release tag URL rejected", () => UpdatePolicy.SelectLatest("[" + Release("v2.0.0", url: "https://github.com/Lev-Good/personal-kiosk/releases/tag/v1.0.0") + "]", true) == null);
+            Check("empty release list handled", () => UpdatePolicy.SelectLatest("[]", true) == null);
+            Check("invalid release response fails visibly", () => { try { UpdatePolicy.SelectLatest("{}", true); return false; } catch (FormatException) { return true; } });
+            var utcNow = new DateTimeOffset(2026, 10, 28, 10, 0, 0, TimeSpan.Zero);
+            Check("automatic updates limited to once daily", () => !UpdatePolicy.CheckDue(utcNow.AddHours(-23), utcNow) && UpdatePolicy.CheckDue(utcNow.AddDays(-1), utcNow));
+            Check("clock rollback cannot suppress checks forever", () => UpdatePolicy.CheckDue(utcNow.AddDays(2), utcNow));
+            bool requestSafe = false;
+            var handler = new StubHandler(request => { requestSafe = request.Method == HttpMethod.Get && request.RequestUri?.ToString() == UpdatePolicy.ApiUrl && request.Headers.Authorization == null && request.Content == null; return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(releases) }; });
+            Check("updater transport sends metadata request without secrets", () => UpdatePolicy.FetchAsync(true, handler).GetAwaiter().GetResult()?.Tag == "v1.3.0-rc.1" && requestSafe);
+            Check("HTTP error does not claim up-to-date", () => { try { UpdatePolicy.FetchAsync(true, new StubHandler(_ => new HttpResponseMessage(HttpStatusCode.TooManyRequests))).GetAwaiter().GetResult(); return false; } catch (HttpRequestException) { return true; } });
+            Check("oversized update response rejected", () => { try { UpdatePolicy.FetchAsync(true, new StubHandler(_ => new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(new string('x', 3 * 1024 * 1024)) })).GetAwaiter().GetResult(); return false; } catch (HttpRequestException) { return true; } });
+            Check("branding and exact home link embedded", () => Brand.Owner == "לב טוב דיגיטל" && Brand.HomeUrl == "https://digital.levtov.uk/index.html" && Brand.Rights.Contains("כל הזכויות שמורות"));
+            Check("installed release metadata is valid for update comparison", () => ReleaseNumber.TryParse(BuildInfo.ReleaseVersion, out _) && BuildInfo.ReleaseVersion.StartsWith(BuildInfo.Version, StringComparison.Ordinal));
         }
         finally
         {
@@ -124,5 +189,11 @@ internal static class SelfTest
         results.Add($"TOTAL {results.Count}, FAILED {failures}");
         File.WriteAllLines(output ?? Path.Combine(Path.GetTempPath(), "PersonalKiosk-SelfTest.txt"), results);
         return failures == 0 ? 0 : 1;
+    }
+    private sealed class StubHandler : HttpMessageHandler
+    {
+        private readonly Func<HttpRequestMessage, HttpResponseMessage> respond;
+        internal StubHandler(Func<HttpRequestMessage, HttpResponseMessage> respond) { this.respond = respond; }
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken token) { token.ThrowIfCancellationRequested(); return Task.FromResult(respond(request)); }
     }
 }

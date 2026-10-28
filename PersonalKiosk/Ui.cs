@@ -50,6 +50,16 @@ internal static class Ui
         p.Children.Add(Text(title, 24)); p.Children.Add(Text(text)); p.Children.Add(Button("סגירה", () => w.Close(), true));
         w.Content = new ScrollViewer { Content = p }; w.ShowDialog();
     }
+    internal static UIElement BrandFooter(Window owner, bool allowLink = true)
+    {
+        var panel = new StackPanel { Margin = new Thickness(4, 8, 4, 4) };
+        panel.Children.Add(Text(Brand.Credit + " · " + Brand.Rights, 12, Muted));
+        panel.Children.Add(Button("לתוכנות חינמיות נוספות — אתר לב טוב דיגיטל", () =>
+        {
+            if (!allowLink) { Message(owner, "פתיחת אתר הבית", "ניתן לפתוח את האתר לאחר יציאה מהקיוסק בסיסמה."); return; }
+            try { Brand.OpenLink(Brand.HomeUrl); } catch (Exception ex) { Message(owner, "לא ניתן לפתוח את האתר", ex.Message); }
+        })); return panel;
+    }
 }
 
 internal sealed class PasswordPrompt
@@ -58,11 +68,13 @@ internal sealed class PasswordPrompt
     private static int failures;
     internal static bool Ask(Window owner, Settings settings, string title)
     {
-        var w = Ui.Dialog(owner, title, 460, 430); w.ResizeMode = ResizeMode.NoResize; w.Topmost = true;
+        var w = Ui.Dialog(owner, title, 480, 520); w.ResizeMode = ResizeMode.NoResize; w.Topmost = true;
         var p = new StackPanel { Margin = new Thickness(28) };
         p.Children.Add(Ui.Text(title, 24)); p.Children.Add(Ui.Text("יש להזין את סיסמת הקיוסק לאישור הפעולה.", 14, Ui.Muted));
         var box = new PasswordBox { FontSize = 22, Padding = new Thickness(10), Margin = new Thickness(4), FlowDirection = FlowDirection.LeftToRight };
         p.Children.Add(box); var error = Ui.Text("", 13, Brushes.Firebrick); p.Children.Add(error);
+        var hint = Ui.Text("", 14, Ui.Muted); hint.Visibility = Visibility.Collapsed;
+        p.Children.Add(Ui.Button("הצגת רמז", () => { hint.Text = string.IsNullOrWhiteSpace(settings.PasswordHint) ? "לא הוגדר רמז לסיסמה." : settings.PasswordHint; hint.Visibility = Visibility.Visible; })); p.Children.Add(hint);
         void Verify()
         {
             if (DateTime.UtcNow < nextAttempt) { error.Text = "יש להמתין מספר שניות לפני ניסיון נוסף."; return; }
@@ -76,19 +88,23 @@ internal sealed class PasswordPrompt
     }
     internal static bool Set(Window owner, Settings settings, Store store)
     {
-        var w = Ui.Dialog(owner, "הגדרת סיסמה", 470, 570); var p = new StackPanel { Margin = new Thickness(26) };
+        var w = Ui.Dialog(owner, "הגדרת סיסמה", 500, 680); var p = new StackPanel { Margin = new Thickness(26) };
         p.Children.Add(Ui.Text("הגדרת סיסמה", 25)); p.Children.Add(Ui.Text("סיסמה אחת ליציאה ולאישור פעולות. אין אפשרות לשחזור. לפחות 4 תווים.", 14, Ui.Muted));
         p.Children.Add(Ui.Text("סיסמה חדשה")); var first = new PasswordBox { Padding = new Thickness(10), FontSize = 20 }; p.Children.Add(first);
         p.Children.Add(Ui.Text("הסיסמה שוב")); var second = new PasswordBox { Padding = new Thickness(10), FontSize = 20 }; p.Children.Add(second);
+        p.Children.Add(Ui.Text("רמז לסיסמה · לא חובה")); var hint = new TextBox { Text = settings.PasswordHint, MaxLength = 200 }; p.Children.Add(hint);
+        p.Children.Add(Ui.Text("הרמז יוצג לכל מי שיבקש לראותו במסך הסיסמה. אין להזין בו את הסיסמה עצמה.", 13, Ui.Muted));
         var error = Ui.Text("", 13, Brushes.Firebrick); p.Children.Add(error);
         p.Children.Add(Ui.Button("שמירת סיסמה", () =>
         {
             try
             {
                 if (first.Password != second.Password) throw new ArgumentException("הסיסמאות אינן תואמות.");
-                var oldSalt = settings.Salt; var oldHash = settings.PasswordHash;
+                if (!string.IsNullOrWhiteSpace(hint.Text) && hint.Text.Trim() == first.Password) throw new ArgumentException("הרמז אינו יכול להיות הסיסמה עצמה.");
+                var oldSalt = settings.Salt; var oldHash = settings.PasswordHash; var oldHint = settings.PasswordHint;
                 Passwords.Set(settings, first.Password);
-                try { store.Save(settings); } catch { settings.Salt = oldSalt; settings.PasswordHash = oldHash; throw; }
+                settings.PasswordHint = hint.Text.Trim();
+                try { store.Save(settings); } catch { settings.Salt = oldSalt; settings.PasswordHash = oldHash; settings.PasswordHint = oldHint; throw; }
                 w.DialogResult = true;
             }
             catch (Exception ex) { error.Text = ex.Message; }
@@ -112,6 +128,10 @@ internal static class SettingsEditor
                 if (copy.Apps.Count == 0) throw new IOException("יש להוסיף לפחות תוכנה אחת.");
                 if (copy.Apps.Any(a => !File.Exists(a.Path))) throw new IOException("אחת התוכנות אינה קיימת. יש להסיר אותה או לתקן את הנתיב.");
                 SchedulePolicy.Validate(copy);
+                FeaturePolicy.Validate(copy); FeaturePolicy.ValidateHint(copy, copy.PasswordHint);
+                // A background check may complete while this settings copy is being edited.
+                if (copy.IncludePrereleaseUpdates == original.IncludePrereleaseUpdates) { copy.LastUpdateCheckUtc = original.LastUpdateCheckUtc; copy.LatestUpdateTag = original.LatestUpdateTag; copy.LatestUpdateUrl = original.LatestUpdateUrl; }
+                else { copy.LastUpdateCheckUtc = null; copy.LatestUpdateTag = ""; copy.LatestUpdateUrl = ""; }
                 try { Startup.Apply(copy); store.Save(copy); }
                 catch { try { Startup.Apply(original); } catch { } throw; }
                 owner.Reload(copy); w.DialogResult = true;
@@ -133,6 +153,7 @@ internal static class SettingsEditor
                 bar.Children.Add(Ui.Text(app.Name, 18)); row.Children.Add(bar);
                 row.Children.Add(new TextBlock { Text = app.Path, TextWrapping = TextWrapping.Wrap, FlowDirection = FlowDirection.LeftToRight, Foreground = Ui.Muted, FontSize = 12 });
                 row.Children.Add(Ui.Text("סוגי קבצים: " + (string.IsNullOrWhiteSpace(app.Extensions) ? "הפעלה בלבד" : app.Extensions), 12, Ui.Muted));
+                if (app.TimeRestricted) row.Children.Add(Ui.Text("זמינות מוגבלת לפי ימים ושעות", 12, Ui.Accent));
                 list.Children.Add(Ui.Card(row));
             }
         }
@@ -144,18 +165,29 @@ internal static class SettingsEditor
         var gate = new CheckBox { Content = "דרישת סיסמה לקיצורי פעולות ולחלונות דו־שיח מזוהים", IsChecked = copy.GateDialogs, Margin = new Thickness(8), FontSize = 15 };
         gate.Checked += (_, _) => copy.GateDialogs = true; gate.Unchecked += (_, _) => copy.GateDialogs = false; p.Children.Add(gate);
         p.Children.Add(Ui.Text("הכיסוי אינו מלא: תפריטים פנימיים, שמירה אוטומטית, מסמכים אחרונים וקישורים בתוך תוכנה עשויים לפעול ללא אישור. אין בידוד של קבצים אישיים בחשבון הקיים.", 13, Ui.Muted));
+        TextBox? hintEditor = null;
         p.Children.Add(Ui.Button("שינוי סיסמה", () =>
         {
-            if (PasswordPrompt.Ask(w, original, "אישור שינוי סיסמה") && PasswordPrompt.Set(w, original, store)) { copy.Salt = original.Salt; copy.PasswordHash = original.PasswordHash; }
+            if (PasswordPrompt.Ask(w, original, "אישור שינוי סיסמה") && PasswordPrompt.Set(w, original, store)) { copy.Salt = original.Salt; copy.PasswordHash = original.PasswordHash; copy.PasswordHint = original.PasswordHint; if (hintEditor != null) hintEditor.Text = copy.PasswordHint; }
         }));
         var tabs = new TabControl();
         tabs.Items.Add(new TabItem { Header = "תוכנות ואפשרויות", Padding = new Thickness(16, 10, 16, 10), Content = new ScrollViewer { Content = p, VerticalScrollBarVisibility = ScrollBarVisibility.Auto } });
         tabs.Items.Add(new TabItem { Header = "לוח זמנים", Padding = new Thickness(16, 10, 16, 10), Content = new ScrollViewer { Content = ScheduleEditor.Create(w, copy), VerticalScrollBarVisibility = ScrollBarVisibility.Auto } });
+        var extras = new StackPanel(); extras.Children.Add(Ui.Text("סיסמה ועדכונים", 25));
+        extras.Children.Add(Ui.Text("רמז לסיסמה · לא חובה")); var hint = new TextBox { Text = copy.PasswordHint, MaxLength = 200 }; hintEditor = hint; hint.TextChanged += (_, _) => copy.PasswordHint = hint.Text.Trim(); extras.Children.Add(hint);
+        extras.Children.Add(Ui.Text("הרמז נשמר כטקסט גלוי ומוצג בלחיצה במסך הסיסמה. אין להזין בו את הסיסמה עצמה.", 13, Ui.Muted));
+        var autoUpdate = new CheckBox { Content = "בדיקת עדכונים אוטומטית בפתיחה ואחת ליום בזמן שהתוכנה פועלת", IsChecked = copy.AutoCheckUpdates, FontSize = 15, Margin = new Thickness(8) };
+        autoUpdate.Checked += (_, _) => copy.AutoCheckUpdates = true; autoUpdate.Unchecked += (_, _) => copy.AutoCheckUpdates = false; extras.Children.Add(autoUpdate);
+        var prereleases = new CheckBox { Content = "הצגת עדכוני גרסאות ניסיון", IsChecked = copy.IncludePrereleaseUpdates, FontSize = 15, Margin = new Thickness(8) };
+        prereleases.Checked += (_, _) => copy.IncludePrereleaseUpdates = true; prereleases.Unchecked += (_, _) => copy.IncludePrereleaseUpdates = false; extras.Children.Add(prereleases);
+        extras.Children.Add(Ui.Text("הבדיקה פונה ל־GitHub כדי לקרוא פרטי מהדורות. לא נשלחים הגדרות, סיסמה או רמז, ולא מתבצעת התקנה אוטומטית. אפשר לבדוק ידנית בכפתור „עדכונים” במסך הבית.", 14, Ui.Muted));
+        extras.Children.Add(Ui.BrandFooter(w));
+        tabs.Items.Add(new TabItem { Header = "סיסמה, עדכונים ואודות", Padding = new Thickness(16, 10, 16, 10), Content = new ScrollViewer { Content = extras, VerticalScrollBarVisibility = ScrollBarVisibility.Auto } });
         outer.Children.Add(tabs); w.Content = outer; w.ShowDialog();
     }
     private static void Edit(Window owner, AllowedApp? existing, Settings settings, Action refresh)
     {
-        var w = Ui.Dialog(owner, existing == null ? "הוספת תוכנה" : "עריכת תוכנה", 600, 480);
+        var w = Ui.Dialog(owner, existing == null ? "הוספת תוכנה" : "עריכת תוכנה", 680, 700);
         var p = new StackPanel { Margin = new Thickness(24) };
         p.Children.Add(Ui.Text("שם התוכנה")); var name = new TextBox { Text = existing?.Name ?? "" }; p.Children.Add(name);
         p.Children.Add(Ui.Text("קובץ הפעלה")); var path = new TextBox { Text = existing?.Path ?? "", FlowDirection = FlowDirection.LeftToRight }; p.Children.Add(path);
@@ -166,11 +198,16 @@ internal static class SettingsEditor
         }));
         p.Children.Add(Ui.Text("סיומות לפתיחת מסמכים, למשל ‎.pdf,.txt")); var extensions = new TextBox { Text = existing?.Extensions ?? "", FlowDirection = FlowDirection.LeftToRight }; p.Children.Add(extensions);
         p.Children.Add(Ui.Text("מאושרים רק מסמכי PDF, טקסט, Word, RTF ו־ODT. אין להוסיף דפדפן, סייר קבצים או כלי פקודות אם רוצים להגביל גישה.", 13, Ui.Muted));
+        var timing = new Settings { ScheduleEnabled = existing?.TimeRestricted ?? false, Schedules = existing == null ? new() : System.Text.Json.JsonSerializer.Deserialize<List<WeeklySchedule>>(System.Text.Json.JsonSerializer.Serialize(existing.Availability))! };
+        p.Children.Add(ScheduleEditor.Create(w, timing, true));
         p.Children.Add(Ui.Button("אישור", () =>
         {
+            try { SchedulePolicy.ValidateWindows(timing.Schedules); if (timing.ScheduleEnabled && !timing.Schedules.Any(s => s.Enabled)) throw new IOException("יש להוסיף לפחות טווח זמינות פעיל."); }
+            catch (Exception ex) { Ui.Message(w, "טווחי הזמינות אינם תקינים", ex.Message); return; }
             if (string.IsNullOrWhiteSpace(name.Text) || !File.Exists(path.Text) || !string.Equals(Path.GetExtension(path.Text), ".exe", StringComparison.OrdinalIgnoreCase)) { Ui.Message(w, "פרטים חסרים", "יש להזין שם ולבחור קובץ EXE קיים."); return; }
             if (settings.Apps.Any(a => a != existing && Policy.SamePath(a.Path, path.Text))) { Ui.Message(w, "התוכנה כבר קיימת", "הקובץ הזה כבר נמצא ברשימה."); return; }
             var app = existing ?? new AllowedApp(); app.Name = name.Text.Trim(); app.Path = Path.GetFullPath(path.Text); app.Extensions = extensions.Text.Trim();
+            app.TimeRestricted = timing.ScheduleEnabled; app.Availability = timing.Schedules;
             if (existing == null) settings.Apps.Add(app); refresh(); w.DialogResult = true;
         }, true));
         w.Content = new ScrollViewer { Content = p }; w.ShowDialog();
@@ -225,8 +262,8 @@ internal static class UsbBrowser
             var item = entries[index]; if (item.Directory) { Navigate(item.Path); return; }
             try
             {
-                var app = settings.Apps.FirstOrDefault(a => Policy.Accepts(a, item.Path) && File.Exists(a.Path));
-                if (app == null) throw new IOException("אין תוכנה מאושרת לסוג הקובץ הזה. יש להגדיר סיומת מתאימה בהגדרות.");
+                var app = settings.Apps.FirstOrDefault(a => Policy.Accepts(a, item.Path) && File.Exists(a.Path) && FeaturePolicy.Available(a, DateTime.Now));
+                if (app == null) throw new IOException("אין תוכנה מאושרת וזמינה בשעה זו לסוג הקובץ הזה. יש לבדוק את הסיומות ושעות הזמינות בהגדרות.");
                 if (!PasswordPrompt.Ask(w, settings, "אישור פתיחת מסמך")) return;
                 if (root == null || !Native.IsUsb(new DriveInfo(root))) throw new IOException("הכונן אינו זמין.");
                 Policy.ValidateUsbPath(item.Path, root);

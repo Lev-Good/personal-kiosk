@@ -12,6 +12,7 @@ namespace PersonalKiosk;
 public static class BuildInfo
 {
     public static string Version => typeof(BuildInfo).Assembly.GetName().Version!.ToString(3);
+    public static string ReleaseVersion => System.Reflection.CustomAttributeExtensions.GetCustomAttribute<System.Reflection.AssemblyInformationalVersionAttribute>(typeof(BuildInfo).Assembly)!.InformationalVersion.Split('+')[0];
 }
 
 public sealed class AllowedApp
@@ -20,6 +21,8 @@ public sealed class AllowedApp
     public string Name { get; set; } = "";
     public string Path { get; set; } = "";
     public string Extensions { get; set; } = "";
+    public bool TimeRestricted { get; set; }
+    public List<WeeklySchedule> Availability { get; set; } = new();
 }
 
 public sealed class Settings
@@ -33,6 +36,14 @@ public sealed class Settings
     public List<AllowedApp> Apps { get; set; } = new();
     public bool ScheduleEnabled { get; set; }
     public List<WeeklySchedule> Schedules { get; set; } = new();
+    public bool ScheduleWarningsEnabled { get; set; } = true;
+    public int ScheduleWarningMinutes { get; set; } = 5;
+    public string PasswordHint { get; set; } = "";
+    public bool AutoCheckUpdates { get; set; } = true;
+    public bool IncludePrereleaseUpdates { get; set; } = true;
+    public DateTimeOffset? LastUpdateCheckUtc { get; set; }
+    public string LatestUpdateTag { get; set; } = "";
+    public string LatestUpdateUrl { get; set; } = "";
 }
 
 public static class Passwords
@@ -78,11 +89,13 @@ public sealed class Store
             catch (Exception ex) when (ex is FormatException or ArgumentException) { throw new IOException("נתוני הסיסמה בקובץ ההגדרות אינם תקינים."); }
         }
         SchedulePolicy.Validate(s);
+        FeaturePolicy.Validate(s);
         return s;
     }
     public void Save(Settings settings)
     {
         SchedulePolicy.Validate(settings);
+        FeaturePolicy.Validate(settings);
         Directory.CreateDirectory(System.IO.Path.GetDirectoryName(FilePath)!);
         var temp = FilePath + ".tmp";
         using (var stream = new FileStream(temp, FileMode.Create, FileAccess.Write, FileShare.None, 4096, FileOptions.WriteThrough))

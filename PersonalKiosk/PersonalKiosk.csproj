@@ -7,7 +7,10 @@
     <ImplicitUsings>disable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <AssemblyName>PersonalKiosk</AssemblyName>
-    <Version>1.1.0</Version>
+    <Version>1.2.0</Version>
+    <InformationalVersion>1.2.0-rc.1</InformationalVersion>
+    <Company>לב טוב דיגיטל</Company>
+    <Copyright>© 2026 לב טוב דיגיטל. כל הזכויות שמורות.</Copyright>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>kiosk.ico</ApplicationIcon>
     <EnableWindowsTargeting>true</EnableWindowsTargeting>

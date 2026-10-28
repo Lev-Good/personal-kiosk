@@ -16,10 +16,23 @@ internal static class Program
     private static int Main(string[] args)
     {
         if (args.Contains("--self-test")) return SelfTest.Run(args.SkipWhile(a => a != "--self-test").Skip(1).FirstOrDefault());
+        if (args.Length == 2 && args[0] == "--probe-updates")
+        {
+            try
+            {
+                var release = UpdatePolicy.FetchAsync(true).GetAwaiter().GetResult();
+                File.WriteAllText(args[1], System.Text.Json.JsonSerializer.Serialize(new { Success = true, Current = BuildInfo.ReleaseVersion, Latest = release?.Tag, Url = release?.Url, Newer = release != null && UpdatePolicy.Newer(release.Tag, BuildInfo.ReleaseVersion) })); return 0;
+            }
+            catch (Exception ex) { File.WriteAllText(args[1], System.Text.Json.JsonSerializer.Serialize(new { Success = false, Error = ex.GetType().Name })); return 1; }
+        }
         if (args.Length == 2 && args[0] == "--watch" && int.TryParse(args[1], out var pid)) return Watch(pid);
         bool setup = args.Contains("--install") || Path.GetFileNameWithoutExtension(Environment.ProcessPath!).Equals("PersonalKioskSetup", StringComparison.OrdinalIgnoreCase);
         var app = new Application { ShutdownMode = ShutdownMode.OnMainWindowClose };
         Ui.Theme(app);
+        if (args.Length == 2 && args[0] == "--render-previews")
+        {
+            PreviewRenderer.Render(args[1]); return 0;
+        }
         app.DispatcherUnhandledException += (_, e) =>
         {
             // Keep the persisted active flag for the watchdog if the UI cannot recover.
