@@ -7,8 +7,8 @@
     <ImplicitUsings>disable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <AssemblyName>PersonalKiosk</AssemblyName>
-    <Version>1.2.0</Version>
-    <InformationalVersion>1.2.0-rc.1</InformationalVersion>
+    <Version>1.3.0</Version>
+    <InformationalVersion>1.3.0-rc.1</InformationalVersion>
     <Company>לב טוב דיגיטל</Company>
     <Copyright>© 2026 לב טוב דיגיטל. כל הזכויות שמורות.</Copyright>
     <ApplicationManifest>app.manifest</ApplicationManifest>
@@ -23,6 +23,7 @@
   </PropertyGroup>
   <ItemGroup>
     <EmbeddedResource Include="Resources\*" />
+    <EmbeddedResource Include="Assets\*" />
     <EmbeddedResource Include="..\מדריך למשתמש.md" LogicalName="PersonalKiosk.Resources.Guide.md" />
   </ItemGroup>
 </Project>

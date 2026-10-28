@@ -44,6 +44,9 @@ public sealed class Settings
     public DateTimeOffset? LastUpdateCheckUtc { get; set; }
     public string LatestUpdateTag { get; set; } = "";
     public string LatestUpdateUrl { get; set; } = "";
+    public KioskVisualSettings Appearance { get; set; } = new();
+    public bool AutoUnlockAtScheduleEnd { get; set; } = true;
+    public DateTime? SessionEndLocal { get; set; }
 }
 
 public static class Passwords

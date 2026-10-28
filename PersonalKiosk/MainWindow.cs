@@ -39,26 +39,44 @@ internal sealed class MainWindow : Window
     private string availabilitySignature = "";
     private NoticeWindow? noticeWindow;
     private DateTime retryNoticeAfter;
+    private KioskDashboard? dashboard;
+    private readonly DispatcherTimer clockTimer = new() { Interval = TimeSpan.FromSeconds(1) };
+    private readonly List<Action<DateTime>> secondaryClocks = new();
+    private DateTime retryUnlockAfter;
     internal MainWindow(Store store, Settings settings, bool preview = false, bool backgroundStart = false)
     {
         this.store = store; this.settings = settings; this.preview = preview; this.backgroundStart = backgroundStart;
-        Title = "קיוסק אישי"; Width = 1060; Height = 740; MinWidth = 780; MinHeight = 580;
+        Title = "קיוסק אישי"; Width = Math.Min(1120, SystemParameters.WorkArea.Width - 24); Height = Math.Min(840, SystemParameters.WorkArea.Height - 24); MinWidth = 760; MinHeight = 560;
         WindowStartupLocation = WindowStartupLocation.CenterScreen; FlowDirection = FlowDirection.RightToLeft;
         FontFamily = new FontFamily("Segoe UI"); Background = Ui.Background; Foreground = Ui.Ink;
         Build(); Closing += OnClosing;
         SourceInitialized += (_, _) => { var source = HwndSource.FromHwnd(new WindowInteropHelper(this).Handle); source?.AddHook(WindowMessage); };
         Loaded += (_, _) =>
         {
+            clockTimer.Start();
             if (preview) { Title += " — תצוגה מקדימה"; return; }
+            if (SessionPolicy.ShouldUnlock(settings, DateTime.Now))
+            {
+                var oldEnd = settings.SessionEndLocal;
+                SessionPolicy.End(settings, DateTime.Now, true);
+                try { store.Save(settings); }
+                catch { settings.KioskActive = true; settings.SessionEndLocal = oldEnd; }
+            }
             UpdateResidentMode();
             if (settings.KioskActive) Enter(true);
             else if (this.backgroundStart && SchedulePolicy.HasSchedule(settings)) { ShowInTaskbar = false; Hide(); }
             MaintenanceTick(); _ = CheckUpdatesAsync(false);
         };
+        clockTimer.Tick += (_, _) =>
+        {
+            if (!IsVisible && !active) return;
+            TryAutomaticExit();
+            var now = DateTime.Now; dashboard?.Update(now); foreach (var update in secondaryClocks) update(now);
+        };
         scheduleTimer.Tick += (_, _) => MaintenanceTick();
         updateTimer.Tick += (_, _) => { _ = CheckUpdatesAsync(false); };
         SystemEvents.DisplaySettingsChanged += DisplaysChanged;
-        Closed += (_, _) => { SystemEvents.DisplaySettingsChanged -= DisplaysChanged; scheduleTimer.Stop(); updateTimer.Stop(); updateCancellation.Cancel(); noticeWindow?.Close(); tray?.Dispose(); guard?.Dispose(); CloseShields(); };
+        Closed += (_, _) => { SystemEvents.DisplaySettingsChanged -= DisplaysChanged; clockTimer.Stop(); scheduleTimer.Stop(); updateTimer.Stop(); updateCancellation.Cancel(); noticeWindow?.Close(); tray?.Dispose(); guard?.Dispose(); CloseShields(); };
     }
     internal void Reload(Settings updated) { bool channelChanged = settings.IncludePrereleaseUpdates != updated.IncludePrereleaseUpdates; settings = updated; if (channelChanged) { lastUpdateAttempt = null; updateStatus = ""; } scheduleError = ""; UpdateResidentMode(); Build(); Dispatcher.BeginInvoke(MaintenanceTick); _ = CheckUpdatesAsync(false); }
     private void UpdateResidentMode()
@@ -84,6 +102,7 @@ internal sealed class MainWindow : Window
     private void MaintenanceTick()
     {
         if (preview || sessionEnding) return;
+        TryAutomaticExit();
         bool dialogOpen = OwnedWindows.Cast<Window>().Any(w => w.IsVisible);
         if (active && !dialogOpen && availabilitySignature != AvailabilitySignature()) Build();
         if (!active && !transition && !prompting && !dialogOpen && DateTime.UtcNow >= retryNoticeAfter)
@@ -179,7 +198,7 @@ internal sealed class MainWindow : Window
                     scheduleError = "הקיוסק לא הופעל. ייעשה ניסיון נוסף בעוד דקה."; Build();
                 }
             }
-            else { store.Save(settings); Build(); }
+            else { settings.SessionEndLocal ??= SessionPolicy.CurrentWindow(settings, now)?.End; store.Save(settings); Build(); }
         }
         catch (Exception ex)
         {
@@ -188,60 +207,25 @@ internal sealed class MainWindow : Window
             retryScheduleAfter = DateTime.UtcNow.AddMinutes(1); ShowMain(); Build();
         }
     }
+    private bool DisplayKiosk => active || (preview && settings.KioskActive);
     private void Build()
     {
-        var outer = new DockPanel { Margin = new Thickness(36, 22, 36, 22) };
         availabilitySignature = AvailabilitySignature();
-        var header = new DockPanel(); DockPanel.SetDock(header, Dock.Top); outer.Children.Add(header);
-        var badge = new Border { Background = active ? new SolidColorBrush(Color.FromRgb(220, 240, 234)) : Brushes.White, CornerRadius = new CornerRadius(20), Padding = new Thickness(18, 7, 18, 7), VerticalAlignment = VerticalAlignment.Center, Child = Ui.Text(!string.IsNullOrEmpty(fault) ? "תקלה בחסימה" : active ? "●  הקיוסק פעיל" : preview ? "תצוגה מקדימה · ללא חסימה" : "○  המחשב במצב רגיל", 13, !string.IsNullOrEmpty(fault) ? Brushes.Firebrick : active ? Ui.Accent : Ui.Muted) };
-        DockPanel.SetDock(badge, Dock.Left); header.Children.Add(badge);
-        var title = new StackPanel(); title.Children.Add(Ui.Text("קיוסק אישי", 34)); title.Children.Add(Ui.Text(active ? "סביבת עבודה פשוטה. כל מה שצריך, במקום אחד." : "בוחרים תוכנות. מפעילים. עובדים בראש שקט.", 15, Ui.Muted)); header.Children.Add(title);
-        var brand = Ui.BrandFooter(this, !active); DockPanel.SetDock(brand, Dock.Bottom); outer.Children.Add(brand);
-        var footer = new DockPanel { Margin = new Thickness(0, 18, 0, 0) }; DockPanel.SetDock(footer, Dock.Bottom); outer.Children.Add(footer);
-        var controls = new WrapPanel(); DockPanel.SetDock(controls, Dock.Right); footer.Children.Add(controls);
-        if (active) controls.Children.Add(Ui.Button("יציאה מהקיוסק", Exit, true));
-        else
-        {
-            controls.Children.Add(Ui.Button("הפעלת הקיוסק", () => { if (!preview) Enter(false); }, true));
-            controls.Children.Add(Ui.Button("הגדרות", () =>
-            {
-                if (preview) return;
-                if (string.IsNullOrEmpty(settings.PasswordHash)) { if (!PasswordPrompt.Set(this, settings, store)) return; }
-                else if (!Ask("אישור כניסה להגדרות")) return;
-                SettingsEditor.Show(this, settings, store);
-            }));
-        }
-        controls.Children.Add(Ui.Button("מידע ועזרה", Help));
-        if (!active) controls.Children.Add(Ui.Button("עדכונים", ShowUpdates));
-        footer.Children.Add(Ui.Text(active ? "חזרה לבית הקיוסק: Ctrl + Alt + Home" : "גרסה " + BuildInfo.Version + "  ·  Windows 10 / 11", 12, Ui.Muted));
-        var body = new StackPanel();
-        if (!active && HasUpdate) body.Children.Add(Ui.Card(Ui.Button("זמינה גרסה חדשה: " + settings.LatestUpdateTag + " — לפרטים ולהורדה", ShowUpdates)));
-        if (!string.IsNullOrEmpty(scheduleError)) body.Children.Add(Ui.Card(Ui.Text(scheduleError, 15, Brushes.Firebrick)));
-        if (!active && SchedulePolicy.HasSchedule(settings))
-        {
-            var next = SchedulePolicy.Next(settings, DateTime.Now);
-            body.Children.Add(Ui.Card(Ui.Text(next.HasValue ? "הפעלה מתוזמנת הבאה: " + next.Value.Schedule.Name + " · " + next.Value.Time.ToString("dd/MM HH:mm") + "\nסגירת החלון תשאיר את התוכנה פועלת ברקע." : "לוח הזמנים מופעל. התוכנה ממשיכה לפעול ברקע.", 14, Ui.Accent)));
-        }
-        if (!string.IsNullOrEmpty(fault)) body.Children.Add(Ui.Card(Ui.Text("תקלה — החסימה אינה תקינה: " + fault + " יש לצאת מהקיוסק באמצעות הסיסמה.", 16, Brushes.Firebrick)));
-        body.Children.Add(Ui.Text("התוכנות שלך", 23));
-        body.Children.Add(Ui.Text(active ? "לבחירת תוכנה, יש ללחוץ על הכרטיס שלה." : "התוכנות שיהיו זמינות לאחר הפעלת הקיוסק", 14, Ui.Muted));
-        var apps = new WrapPanel();
-        foreach (var app in settings.Apps)
-        {
-            bool available = !active || FeaturePolicy.Available(app, DateTime.Now);
-            var card = new StackPanel(); card.Children.Add(Ui.Text(app.Name.EndsWith("Word") ? "W" : app.Extensions.Contains(".pdf") ? "PDF" : app.Name == "פנקס רשימות" ? "Aa" : "▤", 28, Ui.Accent));
-            card.Children.Add(Ui.Text(app.Name, 18)); card.Children.Add(Ui.Text(!available ? "אינה זמינה בשעה זו" : File.Exists(app.Path) ? active ? "פתיחת התוכנה  ←" : "מוכנה לשימוש" : "קובץ התוכנה לא נמצא", 12, Ui.Muted));
-            var button = Ui.Button("", () => { if (active) Launch(app); }); button.Content = card; button.Width = 218; button.Height = 154; button.HorizontalContentAlignment = HorizontalAlignment.Stretch; button.IsEnabled = File.Exists(app.Path) && available; System.Windows.Automation.AutomationProperties.SetName(button, app.Name); apps.Children.Add(button);
-        }
-        body.Children.Add(apps);
-        if (settings.Apps.Count == 0) body.Children.Add(Ui.Text("עדיין אין תוכנות ברשימה. יש להוסיף תוכנות דרך ההגדרות."));
-        if (settings.UsbEnabled)
-        {
-            var usb = new DockPanel(); var open = Ui.Button("עיון בכוננים", () => { if (active) UsbBrowser.Show(this, settings); }); DockPanel.SetDock(open, Dock.Left); usb.Children.Add(open);
-            var description = new StackPanel(); description.Children.Add(Ui.Text("קבצים מכונן USB", 19)); description.Children.Add(Ui.Text("פתיחת מסמכים בכוננים חיצוניים, באישור סיסמה", 13, Ui.Muted)); usb.Children.Add(description); body.Children.Add(Ui.Card(usb));
-        }
-        if (!active) body.Children.Add(Ui.Text("הקיוסק מגביל שימוש מזדמן בחשבון הקיים. הוא אינו מבודד קבצים אישיים; אישור פעולות בתוך תוכנות חיצוניות הוא חלקי. פרטים במידע ועזרה.", 13, Ui.Muted));
-        outer.Children.Add(new ScrollViewer { Content = body, VerticalScrollBarVisibility = ScrollBarVisibility.Auto }); Content = outer;
+        var commands = new DashboardCommands(
+            () => { if (!preview) Enter(false); },
+            () => { if (!preview) Exit(); }, OpenSettings, Help, ShowUpdates,
+            () => { if (active) UsbBrowser.Show(this, settings); },
+            app => { if (active) Launch(app); });
+        dashboard = new KioskDashboard(this, settings, DisplayKiosk, preview, HasUpdate, string.Join("\n", new[] { fault, scheduleError }.Where(s => !string.IsNullOrEmpty(s))), commands);
+        Content = dashboard.View;
+    }
+    internal void RenderAt(DateTime now) => dashboard?.Update(now);
+    private void OpenSettings()
+    {
+        if (preview || active) return;
+        if (string.IsNullOrEmpty(settings.PasswordHash)) { if (!PasswordPrompt.Set(this, settings, store)) return; }
+        else if (!Ask("אישור כניסה להגדרות")) return;
+        SettingsEditor.Show(this, settings, store);
     }
     internal bool Ask(string title)
     {
@@ -255,6 +239,7 @@ internal sealed class MainWindow : Window
         if (active || transition || preview) return;
         transition = true;
         bool previouslyActive = settings.KioskActive;
+        var previousEnd = settings.SessionEndLocal;
         try
         {
             if (!resume)
@@ -264,15 +249,15 @@ internal sealed class MainWindow : Window
                 panel.Children.Add(Ui.Text("לפני שמתחילים", 27));
                 panel.Children.Add(Ui.Text("הקיוסק יפעל בחשבון הנוכחי. תוכנות מאושרות עשויות להגיע לקבצים אישיים ולבצע פעולות ללא סיסמה דרך ממשק פנימי. מסכי מערכת מאובטחים אינם נחסמים."));
                 panel.Children.Add(Ui.Text("תתווסף הפעלה אוטומטית בכניסה לחשבון. לאחר יציאה בסיסמה היא תישאר רק אם לוח הזמנים מופעל. חלונות אחרים ימוזערו ויוחזרו ביציאה. מסמכים לא ייסגרו.", 14, Ui.Muted));
-                panel.Children.Add(Ui.Text("ליציאה דרושה הסיסמה. אין שחזור סיסמה.", 15));
+                panel.Children.Add(Ui.Text(settings.AutoUnlockAtScheduleEnd ? "בסוף רצף סדרים מתוזמן החסימה מסתיימת אוטומטית. יציאה מוקדמת או כניסה ידנית ללא זמן סיום דורשות סיסמה." : "ליציאה דרושה הסיסמה. אין שחזור סיסמה.", 15));
                 panel.Children.Add(Ui.Button("הפעלת הקיוסק", () => consent.DialogResult = true, true)); panel.Children.Add(Ui.Button("ביטול", () => consent.DialogResult = false)); consent.Content = new ScrollViewer { Content = panel };
                 if (consent.ShowDialog() != true) return;
             }
             if (settings.Apps.Count == 0 || string.IsNullOrEmpty(settings.PasswordHash)) throw new IOException("יש להגדיר סיסמה ולפחות תוכנה אחת לפני ההפעלה.");
             noticeWindow?.Close();
             normalBounds = new Rect(Left, Top, ActualWidth, ActualHeight);
-            Startup.Enable(); settings.KioskActive = true; SchedulePolicy.MarkCurrentHandled(settings, DateTime.Now); store.Save(settings);
-            active = true; WindowState = WindowState.Normal; WindowStyle = WindowStyle.None; ResizeMode = ResizeMode.NoResize;
+            Startup.Enable(); SessionPolicy.Begin(settings, DateTime.Now, resume); store.Save(settings);
+            active = true; WindowState = WindowState.Normal; MinWidth = 0; MinHeight = 0; WindowStyle = WindowStyle.None; ResizeMode = ResizeMode.NoResize;
             RebuildScreens(); Build(); Home();
             guard = new Guard(settings, Home, Ask, GuardFault, Dispatcher) { ApprovedForeground = LowerShields };
             guard.Start();
@@ -288,6 +273,7 @@ internal sealed class MainWindow : Window
             else
             {
                 settings.KioskActive = false;
+                settings.SessionEndLocal = previousEnd;
                 try { store.Save(settings); Startup.Apply(settings); } catch { }
                 Ui.Message(this, "הקיוסק לא הופעל", ex.Message);
             }
@@ -297,22 +283,41 @@ internal sealed class MainWindow : Window
     private void Exit()
     {
         if (!active || transition || !Ask("יציאה מהקיוסק")) return;
+        LeaveKiosk(false);
+    }
+    private void TryAutomaticExit()
+    {
+        if (preview || !active || transition || sessionEnding || DateTime.UtcNow < retryUnlockAfter || !SessionPolicy.ShouldUnlock(settings, DateTime.Now)) return;
+        LeaveKiosk(true);
+    }
+    private static void CloseDialogs(Window owner)
+    {
+        foreach (var window in owner.OwnedWindows.Cast<Window>().ToArray()) { CloseDialogs(window); window.Close(); }
+    }
+    private void LeaveKiosk(bool automatic)
+    {
         transition = true;
         try
         {
-            settings.KioskActive = false;
+            var oldEnd = settings.SessionEndLocal;
             var previousDates = settings.Schedules.Select(s => (s, s.LastHandledDate)).ToList();
-            SchedulePolicy.MarkCurrentHandled(settings, DateTime.Now);
+            SessionPolicy.End(settings, DateTime.Now, automatic);
             try { store.Save(settings); }
-            catch { settings.KioskActive = true; foreach (var (schedule, date) in previousDates) schedule.LastHandledDate = date; throw; }
+            catch { settings.KioskActive = true; settings.SessionEndLocal = oldEnd; foreach (var (schedule, date) in previousDates) schedule.LastHandledDate = date; throw; }
             guard?.Dispose(); guard = null; active = false; fault = ""; CloseShields();
-            Topmost = false; WindowStyle = WindowStyle.SingleBorderWindow; ResizeMode = ResizeMode.CanResize;
+            if (automatic) CloseDialogs(this);
+            Topmost = false; MinWidth = 760; MinHeight = 560; WindowStyle = WindowStyle.SingleBorderWindow; ResizeMode = ResizeMode.CanResize;
             Width = normalBounds.Width > 0 ? normalBounds.Width : 1060; Height = normalBounds.Height > 0 ? normalBounds.Height : 740;
             Left = normalBounds.X; Top = normalBounds.Y;
             Build();
             try { Startup.Apply(settings); } catch (Exception ex) { Ui.Message(this, "הקיוסק הופסק", "המצב נשמר ככבוי, אך לא ניתן לעדכן את רישום ההפעלה האוטומטית: " + ex.Message); }
+            if (automatic && SchedulePolicy.HasSchedule(settings)) { ShowInTaskbar = false; Hide(); }
         }
-        catch (Exception ex) { Ui.Message(this, "לא ניתן לצאת", ex.Message); }
+        catch (Exception ex)
+        {
+            if (automatic) { retryUnlockAfter = DateTime.UtcNow.AddMinutes(1); scheduleError = "לא ניתן לסיים את החסימה אוטומטית: " + ex.Message; Build(); }
+            else Ui.Message(this, "לא ניתן לצאת", ex.Message);
+        }
         finally { transition = false; }
     }
     internal void Launch(AllowedApp app, string? file = null)
@@ -342,9 +347,23 @@ internal sealed class MainWindow : Window
         foreach (var screen in Forms.Screen.AllScreens)
         {
             if (screen.Primary) continue;
-            var panel = new StackPanel { VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center, MaxWidth = 440 };
-            panel.Children.Add(Ui.Text("קיוסק אישי", 38)); panel.Children.Add(Ui.Text("אפשר להעביר לכאן תוכנה מאושרת. לחזרה לרשימת התוכנות:", 17, Ui.Muted)); panel.Children.Add(Ui.Button("בית הקיוסק", Home, true));
-            var shield = new Window { Title = "קיוסק אישי — מסך נוסף", WindowStyle = WindowStyle.None, ResizeMode = ResizeMode.NoResize, ShowInTaskbar = false, Background = Ui.Background, FlowDirection = FlowDirection.RightToLeft, Content = panel, Topmost = true };
+            var palette = new KioskPalette(settings.Appearance);
+            var panel = new StackPanel();
+            panel.Children.Add(new LogoImage(48, AppearancePolicy.Motion(settings.Appearance))); panel.Children.Add(DashboardUi.Text("קיוסק אישי", 34, palette.Ink));
+            var clock = DashboardUi.Text(DateTime.Now.ToString("HH:mm:ss"), 60, palette.Accent); clock.FlowDirection = FlowDirection.LeftToRight; panel.Children.Add(clock);
+            var date = DashboardUi.Text("", 15, palette.Muted); panel.Children.Add(date);
+            var countdownCaption = DashboardUi.Text(settings.AutoUnlockAtScheduleEnd ? "עד לפתיחת המחשב" : "עד סוף הסדר", 13, palette.Muted); panel.Children.Add(countdownCaption);
+            var countdown = DashboardUi.Text("", 28, palette.Accent); countdown.FlowDirection = FlowDirection.LeftToRight; panel.Children.Add(countdown);
+            Action<DateTime> updateClock = now =>
+            {
+                clock.Text = now.ToString("HH:mm:ss"); date.Text = now.ToString("dddd, dd MMMM yyyy", System.Globalization.CultureInfo.GetCultureInfo("he-IL"));
+                countdown.Text = settings.SessionEndLocal.HasValue ? SessionPolicy.Countdown(settings.SessionEndLocal.Value - now) : "—";
+                countdown.Visibility = countdownCaption.Visibility = settings.Appearance.ShowCountdown ? Visibility.Visible : Visibility.Collapsed;
+            };
+            secondaryClocks.Add(updateClock); updateClock(DateTime.Now);
+            panel.Children.Add(DashboardUi.Text("אפשר להעביר לכאן תוכנה מאושרת, או לחזור לרשימת התוכנות.", 16, palette.Muted)); panel.Children.Add(Ui.Button("בית הקיוסק", Home, true));
+            var backdrop = DashboardUi.Background(settings.Appearance); var card = DashboardUi.Surface(panel, palette); card.MaxWidth = 480; card.VerticalAlignment = VerticalAlignment.Center; card.HorizontalAlignment = HorizontalAlignment.Center; backdrop.Children.Add(card);
+            var shield = new Window { Title = "קיוסק אישי — מסך נוסף", WindowStyle = WindowStyle.None, ResizeMode = ResizeMode.NoResize, ShowInTaskbar = false, Background = Ui.Background, FlowDirection = FlowDirection.RightToLeft, Content = backdrop, Topmost = true };
             shield.Closing += (_, e) => { if (active && !exiting && !transition) { e.Cancel = true; Home(); } };
             shield.Show(); Place(shield, screen); shields.Add(shield);
         }
@@ -357,7 +376,7 @@ internal sealed class MainWindow : Window
         var bounds = screen.Bounds;
         if (!Native.SetWindowPos(new WindowInteropHelper(window).Handle, IntPtr.Zero, bounds.Left, bounds.Top, bounds.Width, bounds.Height, 0x0014)) throw new IOException("לא ניתן לכסות את כל שטח המסך.");
     }
-    private void CloseShields() { var wasExiting = exiting; exiting = true; foreach (var w in shields.ToArray()) w.Close(); shields.Clear(); exiting = wasExiting; }
+    private void CloseShields() { var wasExiting = exiting; exiting = true; foreach (var w in shields.ToArray()) w.Close(); shields.Clear(); secondaryClocks.Clear(); exiting = wasExiting; }
     private void DisplaysChanged(object? sender, EventArgs e) => Dispatcher.BeginInvoke(() => { if (active) { RebuildScreens(); Home(); } });
     private IntPtr WindowMessage(IntPtr hwnd, int msg, IntPtr wparam, IntPtr lparam, ref bool handled)
     {
@@ -367,8 +386,9 @@ internal sealed class MainWindow : Window
     }
     private void OnClosing(object? sender, CancelEventArgs e)
     {
+        if (preview) return;
         if (active && !exiting && !sessionEnding) { e.Cancel = true; if (!transition) Exit(); }
         else if (!exiting && !sessionEnding && SchedulePolicy.HasSchedule(settings)) { e.Cancel = true; ShowInTaskbar = false; Hide(); }
     }
-    private void Help() => Ui.Message(this, "מידע ועזרה", "קיוסק אישי " + BuildInfo.Version + "\n\nחזרה למסך הבית: Ctrl + Alt + Home. יציאה ושינוי הגדרות מחייבים סיסמה.\n\nבלשונית לוח זמנים מגדירים ימים ושעות לסדרים. התוכנה נשארת ברקע, והקיוסק מופעל בתוך טווח הסדר. יציאה בסיסמה מדלגת על שאר הסדר הנוכחי. סוף הטווח אינו מוציא מהקיוסק. המחשב חייב להיות ער והחשבון מחובר.\n\nהחסימה מיועדת לשימוש מזדמן. אין בידוד קבצים בחשבון הקיים. Ctrl+Alt+Delete, הרשאות מנהל ומסכי Windows מאובטחים אינם נחסמים.\n\nנדרשת סיסמה לקיצורי Ctrl+O/S/P/K ולחלונות מזוהים, אך לא לכל פעולה פנימית. אישור חלון מאפשר להשתמש בו עד סגירתו, לרבות ניווט במחשב. אין אפשרות לשחזר סיסמה.\n\nאין סינון אינטרנט. מסמכים שכבר פתוחים נשארים פתוחים. כונני USB מזוהים לפי סוג החיבור; קוראי כרטיסים ומתאמים מסוימים עשויים להופיע כ־USB.\n\nמומלץ לשמור מסמכים אישיים ולסגור אותם לפני השימוש. מדריך מלא מצורף לחבילה.");
+    private void Help() => Ui.Message(this, "מידע ועזרה", "קיוסק אישי " + BuildInfo.Version + "\n\nחזרה למסך הבית: Ctrl + Alt + Home. יציאה מוקדמת ושינוי הגדרות מחייבים סיסמה.\n\nבלשונית לוח זמנים מגדירים ימים ושעות לסדרים. התוכנה נשארת ברקע, והקיוסק מופעל בתוך טווח הסדר. יציאה בסיסמה מדלגת על שאר הסדר הנוכחי. כברירת מחדל החסימה מסתיימת בסוף רצף הסדרים. ניתן לשנות זאת בלשונית עיצוב המסך. המחשב חייב להיות ער והחשבון מחובר.\n\nהחסימה מיועדת לשימוש מזדמן. אין בידוד קבצים בחשבון הקיים. Ctrl+Alt+Delete, הרשאות מנהל ומסכי Windows מאובטחים אינם נחסמים.\n\nנדרשת סיסמה לקיצורי Ctrl+O/S/P/K ולחלונות מזוהים, אך לא לכל פעולה פנימית. אישור חלון מאפשר להשתמש בו עד סגירתו, לרבות ניווט במחשב. אין אפשרות לשחזר סיסמה.\n\nאין סינון אינטרנט. מסמכים שכבר פתוחים נשארים פתוחים. כונני USB מזוהים לפי סוג החיבור; קוראי כרטיסים ומתאמים מסוימים עשויים להופיע כ־USB.\n\nמומלץ לשמור מסמכים אישיים ולסגור אותם לפני השימוש. מדריך מלא מצורף לחבילה.");
 }

@@ -50,15 +50,18 @@ internal static class Ui
         p.Children.Add(Text(title, 24)); p.Children.Add(Text(text)); p.Children.Add(Button("סגירה", () => w.Close(), true));
         w.Content = new ScrollViewer { Content = p }; w.ShowDialog();
     }
-    internal static UIElement BrandFooter(Window owner, bool allowLink = true)
+    internal static UIElement BrandFooter(Window owner, bool allowLink = true, bool animateLogo = true)
     {
-        var panel = new StackPanel { Margin = new Thickness(4, 8, 4, 4) };
+        var outer = new DockPanel { Margin = new Thickness(4, 8, 4, 4) };
+        var logo = new Border { Background = Brushes.White, CornerRadius = new CornerRadius(12), Padding = new Thickness(2), Margin = new Thickness(0, 0, 10, 0), VerticalAlignment = VerticalAlignment.Center, Child = new LogoImage(96, animateLogo) };
+        DockPanel.SetDock(logo, Dock.Right); outer.Children.Add(logo);
+        var panel = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
         panel.Children.Add(Text(Brand.Credit + " · " + Brand.Rights, 12, Muted));
         panel.Children.Add(Button("לתוכנות חינמיות נוספות — אתר לב טוב דיגיטל", () =>
         {
             if (!allowLink) { Message(owner, "פתיחת אתר הבית", "ניתן לפתוח את האתר לאחר יציאה מהקיוסק בסיסמה."); return; }
             try { Brand.OpenLink(Brand.HomeUrl); } catch (Exception ex) { Message(owner, "לא ניתן לפתוח את האתר", ex.Message); }
-        })); return panel;
+        })); outer.Children.Add(panel); return outer;
     }
 }
 
@@ -173,6 +176,7 @@ internal static class SettingsEditor
         var tabs = new TabControl();
         tabs.Items.Add(new TabItem { Header = "תוכנות ואפשרויות", Padding = new Thickness(16, 10, 16, 10), Content = new ScrollViewer { Content = p, VerticalScrollBarVisibility = ScrollBarVisibility.Auto } });
         tabs.Items.Add(new TabItem { Header = "לוח זמנים", Padding = new Thickness(16, 10, 16, 10), Content = new ScrollViewer { Content = ScheduleEditor.Create(w, copy), VerticalScrollBarVisibility = ScrollBarVisibility.Auto } });
+        tabs.Items.Add(new TabItem { Header = "עיצוב המסך", Padding = new Thickness(16, 10, 16, 10), Content = new ScrollViewer { Content = AppearanceEditor.Create(w, copy), VerticalScrollBarVisibility = ScrollBarVisibility.Auto } });
         var extras = new StackPanel(); extras.Children.Add(Ui.Text("סיסמה ועדכונים", 25));
         extras.Children.Add(Ui.Text("רמז לסיסמה · לא חובה")); var hint = new TextBox { Text = copy.PasswordHint, MaxLength = 200 }; hintEditor = hint; hint.TextChanged += (_, _) => copy.PasswordHint = hint.Text.Trim(); extras.Children.Add(hint);
         extras.Children.Add(Ui.Text("הרמז נשמר כטקסט גלוי ומוצג בלחיצה במסך הסיסמה. אין להזין בו את הסיסמה עצמה.", 13, Ui.Muted));
@@ -181,7 +185,7 @@ internal static class SettingsEditor
         var prereleases = new CheckBox { Content = "הצגת עדכוני גרסאות ניסיון", IsChecked = copy.IncludePrereleaseUpdates, FontSize = 15, Margin = new Thickness(8) };
         prereleases.Checked += (_, _) => copy.IncludePrereleaseUpdates = true; prereleases.Unchecked += (_, _) => copy.IncludePrereleaseUpdates = false; extras.Children.Add(prereleases);
         extras.Children.Add(Ui.Text("הבדיקה פונה ל־GitHub כדי לקרוא פרטי מהדורות. לא נשלחים הגדרות, סיסמה או רמז, ולא מתבצעת התקנה אוטומטית. אפשר לבדוק ידנית בכפתור „עדכונים” במסך הבית.", 14, Ui.Muted));
-        extras.Children.Add(Ui.BrandFooter(w));
+        extras.Children.Add(Ui.BrandFooter(w, true, copy.Appearance.AnimationsEnabled));
         tabs.Items.Add(new TabItem { Header = "סיסמה, עדכונים ואודות", Padding = new Thickness(16, 10, 16, 10), Content = new ScrollViewer { Content = extras, VerticalScrollBarVisibility = ScrollBarVisibility.Auto } });
         outer.Children.Add(tabs); w.Content = outer; w.ShowDialog();
     }

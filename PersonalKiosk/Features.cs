@@ -11,6 +11,7 @@ public static class FeaturePolicy
     public static bool Available(AllowedApp app, DateTime localNow) => !app.TimeRestricted || app.Availability.Any(window => SchedulePolicy.Current(window, localNow).HasValue);
     public static void Validate(Settings settings)
     {
+        AppearancePolicy.Validate(settings.Appearance);
         if (settings.PasswordHint == null || settings.PasswordHint.Length > 200) throw new IOException("רמז הסיסמה יכול להכיל עד 200 תווים.");
         if (settings.ScheduleWarningMinutes < 1 || settings.ScheduleWarningMinutes > 60) throw new IOException("ההתראה המוקדמת חייבת להיות בין דקה ל־60 דקות.");
         foreach (var app in settings.Apps)

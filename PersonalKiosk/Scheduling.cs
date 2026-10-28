@@ -44,7 +44,8 @@ public static class SchedulePolicy
         }
     }
     // Pure wall-clock calculation: the caller supplies local time. An overnight entry
-    // belongs to its START day, and the end is exclusive. No automatic password bypass.
+    // belongs to its START day, and the end is exclusive. SessionPolicy separately
+    // handles the owner's optional automatic opening at the end of the merged session.
     public static ScheduleOccurrence? Current(WeeklySchedule schedule, DateTime localNow)
     {
         if (!schedule.Enabled || !TimeOnly.TryParseExact(schedule.Start, "HH:mm", CultureInfo.InvariantCulture, DateTimeStyles.None, out var start) ||

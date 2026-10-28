@@ -179,6 +179,64 @@ internal static class SelfTest
             Check("oversized update response rejected", () => { try { UpdatePolicy.FetchAsync(true, new StubHandler(_ => new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(new string('x', 3 * 1024 * 1024)) })).GetAwaiter().GetResult(); return false; } catch (HttpRequestException) { return true; } });
             Check("branding and exact home link embedded", () => Brand.Owner == "לב טוב דיגיטל" && Brand.HomeUrl == "https://digital.levtov.uk/index.html" && Brand.Rights.Contains("כל הזכויות שמורות"));
             Check("installed release metadata is valid for update comparison", () => ReleaseNumber.TryParse(BuildInfo.ReleaseVersion, out _) && BuildInfo.ReleaseVersion.StartsWith(BuildInfo.Version, StringComparison.Ordinal));
+            Settings Timetable() => new Settings { ScheduleEnabled = true, Salt = settings.Salt, PasswordHash = settings.PasswordHash, Apps = new() { reader }, Schedules = new() { new WeeklySchedule { Name = "סדר א׳", Start = "09:00", End = "13:00", Days = new() { 0 } }, new WeeklySchedule { Name = "סדר ב׳", Start = "15:00", End = "18:00", Days = new() { 0 } } } };
+            var session = Timetable();
+            Check("auto opening enabled by default", () => session.AutoUnlockAtScheduleEnd);
+            Check("current study window has scheduled end", () => SessionPolicy.CurrentWindow(session, sunday.AddHours(10))?.End == sunday.AddHours(13));
+            SessionPolicy.Begin(session, sunday.AddHours(10), false);
+            Check("session binds opening deadline on entry", () => session.KioskActive && session.SessionEndLocal == sunday.AddHours(13));
+            Check("auto opening never happens early", () => !SessionPolicy.ShouldUnlock(session, sunday.AddHours(13).AddTicks(-1)));
+            Check("auto opening includes exact end boundary", () => SessionPolicy.ShouldUnlock(session, sunday.AddHours(13)));
+            Check("expired session is detected after wake or reboot", () => SessionPolicy.ShouldUnlock(session, sunday.AddDays(1)));
+            scheduledStore.Save(session);
+            Check("opening deadline survives restart", () => SessionPolicy.ShouldUnlock(scheduledStore.Load(), sunday.AddHours(14)));
+            SessionPolicy.Begin(session, sunday.AddHours(12), true);
+            Check("resume preserves existing deadline", () => session.SessionEndLocal == sunday.AddHours(13));
+            SessionPolicy.End(session, sunday.AddHours(13), true);
+            Check("automatic end clears active state and deadline", () => !session.KioskActive && session.SessionEndLocal == null);
+            Check("automatic end leaves next study session scheduled", () => SchedulePolicy.Due(session, sunday.AddHours(15)).Count == 1 && Startup.ShouldAutoStart(session));
+            var delayed = Timetable(); SessionPolicy.Begin(delayed, sunday.AddHours(10), false); SessionPolicy.End(delayed, sunday.AddHours(16), true);
+            Check("delayed automatic end does not skip a new session", () => SchedulePolicy.Due(delayed, sunday.AddHours(16)).Count == 1);
+            var manual = Timetable(); SessionPolicy.Begin(manual, sunday.AddHours(10), false); SessionPolicy.End(manual, sunday.AddHours(11), false);
+            Check("password exit still skips current occurrence", () => SchedulePolicy.Due(manual, sunday.AddHours(12)).Count == 0);
+            var manualOutside = Timetable(); SessionPolicy.Begin(manualOutside, sunday.AddHours(14), false);
+            Check("manual session outside study hours has no automatic deadline", () => manualOutside.KioskActive && manualOutside.SessionEndLocal == null && !SessionPolicy.ShouldUnlock(manualOutside, sunday.AddDays(1)));
+            var passwordOnly = Timetable(); passwordOnly.AutoUnlockAtScheduleEnd = false; SessionPolicy.Begin(passwordOnly, sunday.AddHours(10), false);
+            Check("automatic opening can be disabled in settings", () => !SessionPolicy.ShouldUnlock(passwordOnly, sunday.AddHours(14)) && passwordOnly.KioskActive);
+            var overlap = Timetable(); overlap.Schedules[1].Start = "12:00";
+            Check("overlapping study windows merge without early opening", () => SessionPolicy.CurrentWindow(overlap, sunday.AddHours(10))?.End == sunday.AddHours(18));
+            overlap.Schedules[1].Start = "13:00";
+            Check("touching study windows merge without opening gap", () => SessionPolicy.CurrentWindow(overlap, sunday.AddHours(10))?.End == sunday.AddHours(18));
+            overlap.Schedules[1].Start = "13:01";
+            Check("real gap ends first session on time", () => SessionPolicy.CurrentWindow(overlap, sunday.AddHours(10))?.End == sunday.AddHours(13) && SessionPolicy.CurrentWindow(overlap, sunday.AddHours(13)) == null);
+            var night = Timetable(); night.Schedules = new() { new WeeklySchedule { Start = "23:00", End = "01:00", Days = new() { 0 } } };
+            Check("opening deadline handles midnight", () => SessionPolicy.CurrentWindow(night, sunday.AddHours(23.5))?.End == sunday.AddDays(1).AddHours(1));
+            var weekend = Timetable(); weekend.Schedules = new() { new WeeklySchedule { Start = "23:00", End = "00:30", Days = new() { 6 } }, new WeeklySchedule { Start = "00:30", End = "02:00", Days = new() { 0 } } };
+            Check("opening deadline merges across week boundary", () => SessionPolicy.CurrentWindow(weekend, sunday.AddHours(-.5))?.End == sunday.AddHours(2));
+            var continuous = Timetable(); continuous.Schedules = new() { new WeeklySchedule { Start = "00:00", End = "12:00", Days = Enumerable.Range(0, 7).ToList() }, new WeeklySchedule { Start = "12:00", End = "00:00", Days = Enumerable.Range(0, 7).ToList() } };
+            Check("full-week coverage has no artificial opening deadline", () => SessionPolicy.CurrentWindow(continuous, sunday.AddHours(10)) is { End: null });
+            Check("countdown clamps negative values", () => SessionPolicy.Countdown(TimeSpan.FromSeconds(-1)) == "00:00:00");
+            Check("countdown supports more than 24 hours", () => SessionPolicy.Countdown(TimeSpan.FromHours(27) + TimeSpan.FromMinutes(8) + TimeSpan.FromSeconds(9)) == "27:08:09");
+            Check("invalid visual theme rejected", () => { try { AppearancePolicy.Validate(new KioskVisualSettings { Theme = "unknown" }); return false; } catch (IOException) { return true; } });
+            Check("photo theme requires image selection", () => { try { AppearancePolicy.Validate(new KioskVisualSettings { Theme = "photo" }); return false; } catch (IOException) { return true; } });
+            Check("missing wallpaper returns safe fallback", () => AppearancePolicy.LoadWallpaper(Path.Combine(dir, "missing.png")) == null);
+            var pngPath = Path.Combine(dir, "wallpaper.png");
+            var pngEncoder = new System.Windows.Media.Imaging.PngBitmapEncoder(); pngEncoder.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(System.Windows.Media.Imaging.BitmapSource.Create(2, 2, 96, 96, System.Windows.Media.PixelFormats.Bgra32, null, new byte[16], 8)));
+            using (var pngStream = File.Create(pngPath)) pngEncoder.Save(pngStream);
+            Check("wallpaper loads without upscaling tiny images", () => AppearancePolicy.LoadWallpaper(pngPath)?.PixelWidth == 2);
+            var wallpaperFolder = Path.Combine(dir, "Wallpapers");
+            try
+            {
+                string imported = AppearancePolicy.ImportWallpaper(pngPath, wallpaperFolder);
+                Check("wallpaper import retains original and stores independent copy", () => File.Exists(pngPath) && File.Exists(imported) && !Policy.SamePath(pngPath, imported));
+                var design = Timetable(); design.Appearance = new KioskVisualSettings { Theme = "photo", BackgroundImagePath = imported, AnimationsEnabled = false, ShowCountdown = false }; design.AutoUnlockAtScheduleEnd = false; scheduledStore.Save(design);
+                Check("appearance and automatic-opening preferences persist", () => { var loaded = scheduledStore.Load(); return loaded.Appearance.Theme == "photo" && !loaded.Appearance.AnimationsEnabled && !loaded.Appearance.ShowCountdown && !loaded.AutoUnlockAtScheduleEnd; });
+            }
+            finally { if (Directory.Exists(wallpaperFolder)) { foreach (var file in Directory.EnumerateFiles(wallpaperFolder)) File.Delete(file); Directory.Delete(wallpaperFolder); } }
+            var invalidImage = Path.Combine(dir, "invalid.png"); File.WriteAllText(invalidImage, "not an image");
+            Check("invalid wallpaper rejected without crashing", () => AppearancePolicy.LoadWallpaper(invalidImage) == null);
+            Check("original animated logo is embedded without changes", () => { using var resource = typeof(Brand).Assembly.GetManifestResourceStream("PersonalKiosk.Assets.LevtovLogo.gif"); return resource != null && Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(resource)) == "8E4CC1A8C7EB88E3B8DE729CBB23A1558207F4AA414A13216BD734E0907A7769"; });
+            Check("animated logo contains all original frames", () => LogoImage.FrameCount == 76);
         }
         finally
         {

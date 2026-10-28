@@ -1,13 +1,13 @@
-# Release verification — PersonalKiosk 1.2.0
+# Release verification — PersonalKiosk 1.3.0
 
 Status: packaged release candidate; NOT certified for unrestricted distribution.
 
 ## Completed
 
 - Self-contained Windows x64 release build.
-- 115 automated checks pass, including from the self-contained installer executable. They cover existing kiosk policies, weekly scheduling and migration, notification boundaries/history, overnight app availability, optional hint persistence, version/channel selection, trusted release URLs, bounded metadata transport, network failure handling and branding. Bar-Ilan discovery uses inert fixtures, not an installed copy.
-- A real public GitHub metadata request through the application's updater succeeded: the current 1.2.0-rc.1 build identified v1.1.0-rc.1 as older, not an update. The probe writes a report only; no settings or startup registration are changed.
-- Home, scheduling and app-availability layouts were rendered off-screen in WPF and visually inspected. This does not replace live desktop interaction checks. The prior 1.0.0 home/installer UI was inspected without activating or installing the kiosk.
+- 146 automated checks pass. New checks cover session start/end and persisted deadlines, exact end boundary, restart/wake expiry detection, no early unlocking, overlap/touching/week-boundary merging, full-week continuous coverage, late automatic end preserving the next occurrence, manual entry without a deadline, password-only mode, countdown formatting, wallpaper import/fallback/persistence and the exact original logo hash with all 76 frames. Existing password, file, scheduling, update and hint checks remain passing. Bar-Ilan discovery uses inert fixtures, not an installed copy.
+- The updater was checked against the real public GitHub API in the previous release. This release continues using the same bounded, read-only transport; no settings are sent by a probe.
+- New light/dark/warm kiosk layouts, centered live-clock/countdown values, logo placements and appearance settings were rendered off-screen in WPF and visually inspected. This does not replace real-time animation and desktop interaction checks.
 - Runtime package vulnerability advisory lookup was unavailable because the NuGet service could not be reached. Compilation and local checks passed; no successful online vulnerability audit is claimed.
 - No live kiosk activation, registry startup changes or installation performed on the owner's desktop during development.
 
@@ -32,6 +32,9 @@ Status: packaged release candidate; NOT certified for unrestricted distribution.
 - [ ] Verify active app windows minimize when availability ends, can be used again in the next window, and documents remain open.
 - [ ] Verify automatic and manual update UI with a newer release, stable/prerelease filtering, offline failure and browser download link; no automatic installation.
 - [ ] Verify hint reveal, hint removal, password change and all creator/homepage placements in the installed app.
+- [ ] Verify one-second clock/date updates, countdown and frame-by-frame GIF animation on actual monitors, including reduced-motion behavior and hidden/background states.
+- [ ] Verify automatic opening at session end (including with kiosk dialogs open), hiding to tray, next automatic start, password-only opt-out and persisted expiry after reboot.
+- [ ] Test custom wallpaper selection, persistence when the original is moved, missing-image fallback and mixed-DPI secondary screens.
 - [ ] Verify elevated/secure Windows UI limitations are visible to operator.
 - [ ] Review with owner that approved app dialogs can expose personal files; same-account protection remains partial.
 - [ ] Sign executable with publisher certificate, rebuild checksums, review bundled runtime notices, then distribute publicly.

@@ -12,10 +12,10 @@ Requires Windows x64 and .NET SDK 10. Run `pwsh -File ./build.ps1` from this dir
 
 Outputs in `dist/`:
 
-- `PersonalKiosk-1.2.0-win-x64/PersonalKioskSetup.exe`: per-user installer. Installer mode is selected by this exact filename or `--install`.
+- `PersonalKiosk-1.3.0-win-x64/PersonalKioskSetup.exe`: per-user installer. Installer mode is selected by this exact filename or `--install`.
 - `app/PersonalKiosk.exe`: portable application.
-- `PersonalKiosk-1.2.0-win-x64.zip`: distribution candidate, guide, licenses, test results and checksums.
-- `PersonalKiosk-1.2.0-source.zip`: source-only archive, without settings or build output.
+- `PersonalKiosk-1.3.0-win-x64.zip`: distribution candidate, guide, licenses, test results and checksums.
+- `PersonalKiosk-1.3.0-source.zip`: source-only archive, without settings or build output.
 
 The portable executable must stay at the same path while the kiosk is active; the startup registration and watchdog refer to that path. Installation places it under `%LOCALAPPDATA%\Programs\PersonalKiosk`.
 
@@ -35,7 +35,7 @@ The portable executable must stay at the same path while the kiosk is active; th
 
 `Core.cs`: settings, PBKDF2 password derivation, atomic persistence, discovery, path policy and startup registration.
 
-`Scheduling.cs` / `ScheduleEditor.cs`: optional weekly activation windows with names, selected weekdays, start/end wall-clock times and overnight support. The end is exclusive and never unlocks the kiosk. A password exit consumes all currently active occurrences; later windows still fire. The 10-second dispatcher check catches login/wake inside a window and skips fully missed windows. Occurrence history is persisted, preventing the current window from re-triggering after a normal restart or a repeated wall-clock hour. Settings dialogs defer activation until closed. Scheduling defaults off for both new and older settings files.
+`Scheduling.cs` / `ScheduleEditor.cs`: optional weekly activation windows with names, selected weekdays, start/end wall-clock times and overnight support. The end boundary is exclusive. From 1.3, an owner-configured automatic opening is enabled by default at the end of the continuous study session. A password exit consumes all currently active occurrences; later windows still fire. The 10-second dispatcher check catches login/wake inside a window and skips fully missed windows. Occurrence history is persisted, preventing the current window from re-triggering after a normal restart or a repeated wall-clock hour. Settings dialogs defer activation until closed. Scheduling itself defaults off for both new and older settings files.
 
 When schedules are enabled, the normal Close button hides to a tray icon and HKCU Run remains registered after password exit. The tray menu can terminate the resident runner after password confirmation; it returns on the next application launch/login. Opening another normal instance signals the existing process to show its window. No wake timers, Task Scheduler jobs, services or automatic Windows login are installed. The computer must be awake with the user logged in.
 
@@ -52,6 +52,16 @@ When schedules are enabled, the normal Close button hides to a tray icon and HKC
 - `Updates.cs`: automatic public GitHub releases metadata check, at most once per successful 24-hour interval while running, with one-hour failure cooldown and a manual check. Stable/prerelease channel selection, semantic-version ordering including RC numbers, bounded 2 MiB responses, 15-second timeout, trusted repository URLs and uploaded installer checks. No credentials or settings are sent and nothing is installed automatically. Reference: [GitHub Releases API](https://docs.github.com/en/rest/releases/releases#list-releases).
 - Optional 200-character plain-text password hint, revealed only on request. It never unlocks/resets the password; the UI refuses a hint equal to the password.
 - Creator/copyright/homepage attribution in the app, installer, Windows publisher metadata and embedded rights notice. Runtime licenses are retained.
+
+## Version 1.3 dashboard and session end
+
+`KioskDashboard.cs`, `Appearance.cs`, `AppearanceEditor.cs`: live clock/date/countdown, rounded tiles, light/dark/warm presets, private imported wallpaper (PNG/JPEG/BMP, max 20 MiB), hover/entry/ambient animations and a motion-off option. Missing/corrupt photos fall back to a built-in background. The public package contains no personal wallpapers. Settings import copies images locally; cancellation may leave an unused private copy, which is never uploaded.
+
+`LogoImage.cs`: the original 76-frame GIF is embedded unchanged, decoded once into shared frozen 160×90 frames and animated only while visible and motion is enabled. Header and credit placements use the same original asset. OS client-area animation preference is respected; disabling motion shows a static frame.
+
+`SessionPolicy.cs`: merge overlapping and touching weekly intervals, including midnight and week boundaries; full-week continuous coverage has no artificial finite deadline. Persist the session deadline at entry and preserve it on resume. Default automatic end unlocks without a password, restores minimized windows, closes only kiosk-owned dialogs and hides the kiosk to its existing tray runner until the next session. Manual entry outside an active schedule has no automatic deadline. Password-only ending remains selectable in protected appearance settings. A late automatic end does not mark a future occurrence handled. Failed persistence leaves the existing restriction in place and reports an error.
+
+The one-second UI timer updates existing text controls instead of rebuilding the dashboard, and checks automatic end independently of the ten-second activation timer. Off-screen previews cover light/dark/warm kiosk states, countdown and appearance settings without activating restrictions.
 
 ## Boundaries and release status
 
