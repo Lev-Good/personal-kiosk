@@ -1,0 +1,13 @@
+PersonalKiosk/bin/
+PersonalKiosk/obj/
+dist/
+.bundle-test/
+test-results*.txt
+PersonalKiosk-Test-*/
+**/settings.json
+**/settings.json.bak
+**/settings.json.tmp
+**/errors.log
+.vs/
+*.user
+*.suo
