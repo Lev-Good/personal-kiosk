@@ -7,7 +7,7 @@
     <ImplicitUsings>disable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <AssemblyName>PersonalKiosk</AssemblyName>
-    <Version>1.0.0</Version>
+    <Version>1.1.0</Version>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>kiosk.ico</ApplicationIcon>
     <EnableWindowsTargeting>true</EnableWindowsTargeting>

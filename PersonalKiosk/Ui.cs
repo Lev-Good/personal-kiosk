@@ -111,7 +111,10 @@ internal static class SettingsEditor
             {
                 if (copy.Apps.Count == 0) throw new IOException("יש להוסיף לפחות תוכנה אחת.");
                 if (copy.Apps.Any(a => !File.Exists(a.Path))) throw new IOException("אחת התוכנות אינה קיימת. יש להסיר אותה או לתקן את הנתיב.");
-                store.Save(copy); owner.Reload(copy); w.DialogResult = true;
+                SchedulePolicy.Validate(copy);
+                try { Startup.Apply(copy); store.Save(copy); }
+                catch { try { Startup.Apply(original); } catch { } throw; }
+                owner.Reload(copy); w.DialogResult = true;
             }
             catch (Exception ex) { Ui.Message(w, "לא ניתן לשמור", ex.Message); }
         }, true));
@@ -145,7 +148,10 @@ internal static class SettingsEditor
         {
             if (PasswordPrompt.Ask(w, original, "אישור שינוי סיסמה") && PasswordPrompt.Set(w, original, store)) { copy.Salt = original.Salt; copy.PasswordHash = original.PasswordHash; }
         }));
-        outer.Children.Add(new ScrollViewer { Content = p, VerticalScrollBarVisibility = ScrollBarVisibility.Auto }); w.Content = outer; w.ShowDialog();
+        var tabs = new TabControl();
+        tabs.Items.Add(new TabItem { Header = "תוכנות ואפשרויות", Padding = new Thickness(16, 10, 16, 10), Content = new ScrollViewer { Content = p, VerticalScrollBarVisibility = ScrollBarVisibility.Auto } });
+        tabs.Items.Add(new TabItem { Header = "לוח זמנים", Padding = new Thickness(16, 10, 16, 10), Content = new ScrollViewer { Content = ScheduleEditor.Create(w, copy), VerticalScrollBarVisibility = ScrollBarVisibility.Auto } });
+        outer.Children.Add(tabs); w.Content = outer; w.ShowDialog();
     }
     private static void Edit(Window owner, AllowedApp? existing, Settings settings, Action refresh)
     {

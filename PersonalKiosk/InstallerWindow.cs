@@ -44,7 +44,7 @@ internal sealed class InstallerWindow : Window
             var menu = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Programs), "קיוסק אישי"); Directory.CreateDirectory(menu);
             Shortcut(Path.Combine(menu, "קיוסק אישי.lnk"), ""); Shortcut(Path.Combine(menu, "הסרת קיוסק אישי.lnk"), "--uninstall");
             using var key = Microsoft.Win32.Registry.CurrentUser.CreateSubKey(@"Software\Microsoft\Windows\CurrentVersion\Uninstall\PersonalKiosk");
-            key.SetValue("DisplayName", "קיוסק אישי"); key.SetValue("DisplayVersion", "1.0.0"); key.SetValue("Publisher", "PersonalKiosk"); key.SetValue("InstallLocation", InstallDir); key.SetValue("UninstallString", "\"" + InstalledExe + "\" --uninstall"); key.SetValue("DisplayIcon", InstalledExe); key.SetValue("NoModify", 1); key.SetValue("NoRepair", 1);
+            key.SetValue("DisplayName", "קיוסק אישי"); key.SetValue("DisplayVersion", BuildInfo.Version); key.SetValue("Publisher", "PersonalKiosk"); key.SetValue("InstallLocation", InstallDir); key.SetValue("UninstallString", "\"" + InstalledExe + "\" --uninstall"); key.SetValue("DisplayIcon", InstalledExe); key.SetValue("NoModify", 1); key.SetValue("NoRepair", 1);
             status.Text = "ההתקנה הושלמה. אפשר לפתוח את התוכנה מקיצור הדרך בשולחן העבודה. מצב קיוסק לא הופעל.";
             install.IsEnabled = false;
         }

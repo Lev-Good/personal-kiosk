@@ -2,9 +2,12 @@ param([string]$Configuration = 'Release', [switch]$PackageOnly)
 $ErrorActionPreference = 'Stop'
 Set-Location -LiteralPath $PSScriptRoot
 $projectPath = Join-Path $PSScriptRoot 'PersonalKiosk\PersonalKiosk.csproj'
+$projectXml = [xml](Get-Content -LiteralPath $projectPath -Raw)
+$version = [string]$projectXml.Project.PropertyGroup.Version
+if ($version -notmatch '^\d+\.\d+\.\d+$') { throw 'Invalid project version' }
 $distPath = Join-Path $PSScriptRoot 'dist'
 $publishPath = Join-Path $distPath 'app'
-$releasePath = Join-Path $distPath 'PersonalKiosk-1.0.0-win-x64'
+$releasePath = Join-Path $distPath "PersonalKiosk-$version-win-x64"
 New-Item -ItemType Directory -Path $releasePath -Force | Out-Null
 
 $testReport = Join-Path $releasePath 'TEST-RESULTS.txt'
@@ -41,10 +44,10 @@ $html += $htmlBody.ToString() + '</main></html>'
 
 $hashLines = foreach ($file in Get-ChildItem -LiteralPath $releasePath -File | Where-Object Name -ne 'SHA256SUMS.txt' | Sort-Object Name) { (Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256).Hash + '  ' + $file.Name }
 [System.IO.File]::WriteAllLines((Join-Path $releasePath 'SHA256SUMS.txt'), $hashLines)
-Compress-Archive -LiteralPath $releasePath -DestinationPath (Join-Path $distPath 'PersonalKiosk-1.0.0-win-x64.zip') -Force
+Compress-Archive -LiteralPath $releasePath -DestinationPath (Join-Path $distPath "PersonalKiosk-$version-win-x64.zip") -Force
 
 $sourceFiles = @((Join-Path $PSScriptRoot 'PersonalKiosk'), (Join-Path $PSScriptRoot 'build.ps1'), (Join-Path $PSScriptRoot 'README.md'), (Join-Path $PSScriptRoot 'מדריך למשתמש.md'), (Join-Path $PSScriptRoot 'RELEASE-CHECKLIST.md'))
-$sourceZip = Join-Path $distPath 'PersonalKiosk-1.0.0-source.zip'
+$sourceZip = Join-Path $distPath "PersonalKiosk-$version-source.zip"
 # Add only source files; bin/obj and machine-specific state are never packaged.
 Add-Type -AssemblyName System.IO.Compression
 $zipStream = [System.IO.File]::Create($sourceZip)

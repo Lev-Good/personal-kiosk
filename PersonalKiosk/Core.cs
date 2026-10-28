@@ -9,6 +9,11 @@ using Microsoft.Win32;
 
 namespace PersonalKiosk;
 
+public static class BuildInfo
+{
+    public static string Version => typeof(BuildInfo).Assembly.GetName().Version!.ToString(3);
+}
+
 public sealed class AllowedApp
 {
     public string Id { get; set; } = Guid.NewGuid().ToString("N");
@@ -26,6 +31,8 @@ public sealed class Settings
     public bool UsbEnabled { get; set; } = true;
     public bool GateDialogs { get; set; } = true;
     public List<AllowedApp> Apps { get; set; } = new();
+    public bool ScheduleEnabled { get; set; }
+    public List<WeeklySchedule> Schedules { get; set; } = new();
 }
 
 public static class Passwords
@@ -70,10 +77,12 @@ public sealed class Store
             try { if (Convert.FromBase64String(s.Salt).Length != 24 || Convert.FromBase64String(s.PasswordHash).Length != 32) throw new FormatException(); }
             catch (Exception ex) when (ex is FormatException or ArgumentException) { throw new IOException("נתוני הסיסמה בקובץ ההגדרות אינם תקינים."); }
         }
+        SchedulePolicy.Validate(s);
         return s;
     }
     public void Save(Settings settings)
     {
+        SchedulePolicy.Validate(settings);
         Directory.CreateDirectory(System.IO.Path.GetDirectoryName(FilePath)!);
         var temp = FilePath + ".tmp";
         using (var stream = new FileStream(temp, FileMode.Create, FileAccess.Write, FileShare.None, 4096, FileOptions.WriteThrough))
@@ -166,12 +175,15 @@ public static class Discovery
             try { using var key = hive.OpenSubKey(view + exe); if (key?.GetValue(null) is string value) Add(exe == "WINWORD.EXE" ? "Word" : Path.GetFileNameWithoutExtension(exe), exe == "WINWORD.EXE" ? ".docx,.doc,.rtf,.odt" : ".pdf", value.Trim('"')); }
             catch (System.Security.SecurityException) { }
         }
+        foreach (var path in ResponsaDiscovery.Find()) Add("בר־אילן — פרויקט השו״ת", "", path);
         return result;
     }
 }
 
 public static class Startup
 {
+    public static bool ShouldAutoStart(Settings settings) => settings.KioskActive || SchedulePolicy.HasSchedule(settings);
+    public static void Apply(Settings settings) { if (ShouldAutoStart(settings)) Enable(); else Disable(); }
     public static void Enable()
     {
         using var key = Registry.CurrentUser.CreateSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run", true);

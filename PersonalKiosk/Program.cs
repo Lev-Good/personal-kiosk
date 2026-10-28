@@ -10,6 +10,8 @@ namespace PersonalKiosk;
 internal static class Program
 {
     private static Mutex? mutex;
+    private static EventWaitHandle? showRequest;
+    private static RegisteredWaitHandle? showListener;
     [STAThread]
     private static int Main(string[] args)
     {
@@ -27,17 +29,37 @@ internal static class Program
         try
         {
             mutex = new Mutex(true, @"Local\PersonalKiosk_" + Environment.UserName, out bool created);
-            if (!created) { MessageBox.Show("קיוסק אישי כבר פועל. יש לעבור לחלון הקיים.", "קיוסק אישי"); return 1; }
+            if (!created)
+            {
+                if (setup || args.Contains("--uninstall")) { MessageBox.Show("יש לסגור את קיוסק אישי לפני התקנה או הסרה. אם התזמון מופעל, אפשר לסגור את התוכנה מהסמל שלה ליד השעון.", "קיוסק אישי"); return 1; }
+                if (!args.Contains("--resume"))
+                {
+                    try { using var request = EventWaitHandle.OpenExisting(@"Local\PersonalKiosk_Show_" + Environment.UserName); request.Set(); }
+                    catch (WaitHandleCannotBeOpenedException) { MessageBox.Show("קיוסק אישי כבר פועל. יש לעבור לחלון הקיים.", "קיוסק אישי"); }
+                }
+                return 0;
+            }
             if (setup) { app.Run(new InstallerWindow()); return 0; }
             if (args.Contains("--uninstall")) { app.Run(new InstallerWindow(true)); return 0; }
+            if (args.Contains("--preview-schedule") || Path.GetFileNameWithoutExtension(Environment.ProcessPath!).Equals("PersonalKioskSchedulePreview", StringComparison.OrdinalIgnoreCase))
+            {
+                var previewWindow = new Window { Title = "לוח זמנים — תצוגה מקדימה", Width = 780, Height = 760, WindowStartupLocation = WindowStartupLocation.CenterScreen, FlowDirection = FlowDirection.RightToLeft, Background = Ui.Background, FontFamily = new System.Windows.Media.FontFamily("Segoe UI") };
+                var panel = new System.Windows.Controls.StackPanel { Margin = new Thickness(24) };
+                panel.Children.Add(Ui.Text("תצוגה מקדימה בלבד — השינויים אינם נשמרים", 14, Ui.Accent));
+                panel.Children.Add(ScheduleEditor.Create(previewWindow, new Settings { Schedules = new() { new WeeklySchedule { Name = "סדר א׳", Start = "09:00", End = "13:00" }, new WeeklySchedule { Name = "סדר ב׳", Start = "15:30", End = "19:00" }, new WeeklySchedule { Name = "סדר ג׳", Start = "20:30", End = "22:30" } } }));
+                previewWindow.Content = new System.Windows.Controls.ScrollViewer { Content = panel }; app.Run(previewWindow); return 0;
+            }
             bool preview = args.Contains("--preview") || Path.GetFileNameWithoutExtension(Environment.ProcessPath!).Equals("PersonalKioskPreview", StringComparison.OrdinalIgnoreCase);
             var store = new Store(); var settings = preview ? new Settings { Apps = Discovery.Find() } : store.Load();
-            if (args.Contains("--resume") && !settings.KioskActive) return 0;
-            app.Run(new MainWindow(store, settings, preview));
+            if (args.Contains("--resume") && !Startup.ShouldAutoStart(settings)) return 0;
+            var window = new MainWindow(store, settings, preview, args.Contains("--resume"));
+            showRequest = new EventWaitHandle(false, EventResetMode.AutoReset, @"Local\PersonalKiosk_Show_" + Environment.UserName);
+            showListener = ThreadPool.RegisterWaitForSingleObject(showRequest, (_, _) => { if (!app.Dispatcher.HasShutdownStarted) app.Dispatcher.BeginInvoke(window.ShowMain); }, null, Timeout.Infinite, false);
+            app.Run(window);
             return 0;
         }
         catch (Exception ex) { MessageBox.Show("לא ניתן להפעיל את קיוסק אישי.\n" + ex.Message, "קיוסק אישי", MessageBoxButton.OK, MessageBoxImage.Error); return 1; }
-        finally { mutex?.Dispose(); }
+        finally { showListener?.Unregister(null); showRequest?.Dispose(); mutex?.Dispose(); }
     }
     private static int Watch(int pid)
     {
