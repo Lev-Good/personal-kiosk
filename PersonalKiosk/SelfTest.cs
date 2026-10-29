@@ -221,9 +221,9 @@ internal static class SelfTest
             Check("countdown supports more than 24 hours", () => SessionPolicy.Countdown(TimeSpan.FromHours(27) + TimeSpan.FromMinutes(8) + TimeSpan.FromSeconds(9)) == "27:08:09");
             Check("invalid visual theme rejected", () => { try { AppearancePolicy.Validate(new KioskVisualSettings { Theme = "unknown" }); return false; } catch (IOException) { return true; } });
             Check("photo theme requires image selection", () => { try { AppearancePolicy.Validate(new KioskVisualSettings { Theme = "photo" }); return false; } catch (IOException) { return true; } });
-            Check("bundled lake background loads offline", () => AppearancePolicy.LoadBuiltInWallpaper("lake") is { PixelWidth: > 1000, PixelHeight: > 400 });
-            Check("bundled desert background loads offline", () => AppearancePolicy.LoadBuiltInWallpaper("desert") is { PixelWidth: >= 1200, PixelHeight: >= 600 });
-            Check("bundled panorama background loads offline", () => AppearancePolicy.LoadBuiltInWallpaper("alps") is { PixelWidth: >= 2000, PixelHeight: > 300 });
+            foreach (var theme in new[] { "lake", "desert", "mountainlake", "forest", "snow", "northern", "ocean", "tea", "mirrorlake", "moraine" })
+                Check("bundled " + theme + " background loads offline", () => AppearancePolicy.LoadBuiltInWallpaper(theme) is { PixelWidth: >= 900, PixelHeight: >= 400 });
+            Check("people-containing former panorama is not embedded", () => !System.Reflection.Assembly.GetExecutingAssembly().GetManifestResourceNames().Contains("PersonalKiosk.Assets.LandscapeAlps.jpg"));
             Check("missing wallpaper returns safe fallback", () => AppearancePolicy.LoadWallpaper(Path.Combine(dir, "missing.png")) == null);
             var pngPath = Path.Combine(dir, "wallpaper.png");
             var pngEncoder = new System.Windows.Media.Imaging.PngBitmapEncoder(); pngEncoder.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(System.Windows.Media.Imaging.BitmapSource.Create(2, 2, 96, 96, System.Windows.Media.PixelFormats.Bgra32, null, new byte[16], 8)));

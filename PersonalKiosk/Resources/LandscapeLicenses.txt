@@ -1,30 +1,60 @@
 Bundled landscape images
 ========================
 
-The following images are embedded for offline background selection. They are
-not owned by Lev Tov Digital. Each source page was checked on 29 October 2026.
+The ten images below are embedded for offline background selection. They were
+visually checked to contain no people. They are not owned by Lev Tov Digital.
+Each source and license page was checked on 29 October 2026. Wikimedia Commons
+hosts the source files and does not endorse PersonalKiosk or Lev Tov Digital.
 
-LandscapeLake.jpg
-Title: Scenic view of lake with mountains
+LandscapeLake.jpg — Scenic view of lake with mountains
 Author: Karthika Manikandan
 Source: https://commons.wikimedia.org/wiki/File:Scenic_view_of_lake_with_mountains.jpg
 License: Creative Commons CC0 1.0 Universal Public Domain Dedication
-License URL: https://creativecommons.org/publicdomain/zero/1.0/
 
-LandscapeDesert.jpg
-Title: American Desert
+LandscapeDesert.jpg — American Desert
 Author: Alanthebox
 Source: https://commons.wikimedia.org/wiki/File:American_Desert.JPG
 License: Creative Commons CC0 1.0 Universal Public Domain Dedication
-License URL: https://creativecommons.org/publicdomain/zero/1.0/
-Bundled copy: Wikimedia's 1280-pixel derivative of the source image.
 
-LandscapeAlps.jpg
-Title: PeytoLakePanorama
-Author: Laszlo van den Hoek
-Source: https://commons.wikimedia.org/wiki/File:PeytoLakePanorama.jpg
-License: Released into the public domain by the copyright holder (PD-self)
-Bundled copy: current Wikimedia Commons file, a stitched panorama.
+LandscapeMountainLake.jpg — Lake Mountain Landscape
+Author: Bonnie Moreland
+Source: https://commons.wikimedia.org/wiki/File:Lake_Mountain_Landscape.jpg
+License: Creative Commons CC0 1.0 Universal Public Domain Dedication
 
-Wikimedia Commons hosts the source files and is not affiliated with or an
-endorser of PersonalKiosk or Lev Tov Digital.
+LandscapeForest.jpg — Waterfall in forest
+Author: Martin Eklund
+Source: https://commons.wikimedia.org/wiki/File:Waterfall_in_forest.jpg
+License: Creative Commons CC0 1.0 Universal Public Domain Dedication
+
+LandscapeSnow.jpg — Snowy mountain range
+Author: MonikaP
+Source: https://commons.wikimedia.org/wiki/File:Snowy_mountain_range.jpg
+License: Creative Commons CC0 1.0 Universal Public Domain Dedication
+
+LandscapeAurora.jpg — Aurora in Fairbanks
+Author: Karthik Sridharan
+Source: https://commons.wikimedia.org/wiki/File:Aurora_in_Fairbanks.jpg
+License: Creative Commons CC0 1.0 Universal Public Domain Dedication
+
+LandscapeOcean.jpg — Ocean sunset (Unsplash)
+Author: Cody Weiher
+Source: https://commons.wikimedia.org/wiki/File:Ocean_sunset_(Unsplash).jpg
+License: Creative Commons CC0 1.0 Universal Public Domain Dedication
+
+LandscapeTea.jpg — Tes Plantation in West Sumatra
+Author: Khaira13
+Source: https://commons.wikimedia.org/wiki/File:Tes_Plantation_in_West_Sumatra.jpg
+License: Creative Commons CC0 1.0 Universal Public Domain Dedication
+
+LandscapeMirrorLake.jpg — Mirrored mountains in clear lake water
+Author: Steve Hillebrand, U.S. Fish and Wildlife Service
+Source: https://commons.wikimedia.org/wiki/File:Mirrored_lmountains_in_clear_lake_water.jpg
+License: Public domain
+
+LandscapeMoraine.jpg — Moraine Lake Panorama
+Author: Farwestern
+Source: https://commons.wikimedia.org/wiki/File:Moraine_Lake_Panorama.jpg
+License: Released into the public domain by the copyright holder
+
+CC0 license: https://creativecommons.org/publicdomain/zero/1.0/
+Bundled files use Wikimedia Commons 1280-pixel derivatives where available.

@@ -1,11 +1,11 @@
-# Release verification — PersonalKiosk 1.5.0
+# Release verification — PersonalKiosk 1.6.0
 
 Status: packaged release candidate; NOT certified for unrestricted distribution.
 
 ## Completed
 
 - Self-contained Windows x64 release build.
-- 151 automated checks pass. New checks cover all three embedded landscape backgrounds, their bundled licensing resource, and exact process identity matching that prevents recycled handles from restoring the wrong window. Existing session, password, file, scheduling, update, hint, wallpaper and 76-frame logo checks remain passing. Bar-Ilan discovery uses inert fixtures, not an installed copy.
+- 159 automated checks pass. New checks load all ten embedded landscape backgrounds offline and verify that the former people-containing panorama is no longer embedded. Existing process-identity, session, password, file, scheduling, update, hint, wallpaper and 76-frame logo checks remain passing. Bar-Ilan discovery uses inert fixtures, not an installed copy.
 - The updater was checked against the real public GitHub API in the previous release. This release continues using the same bounded, read-only transport; no settings are sent by a probe.
 - The Fluent-style light/dark/warm kiosk layouts, primary action, 44×44 program icons, thin scrollbars, toggle rows, centered live-clock/countdown values, logo placements, schedule and appearance settings were rendered off-screen in WPF and visually inspected. This does not replace real-time animation and desktop interaction checks.
 - Runtime package vulnerability advisory lookup was unavailable because the NuGet service could not be reached. Compilation and local checks passed; no successful online vulnerability audit is claimed.
@@ -36,6 +36,7 @@ Status: packaged release candidate; NOT certified for unrestricted distribution.
 - [ ] Verify one-second clock/date updates, countdown and frame-by-frame GIF animation on actual monitors, including reduced-motion behavior and hidden/background states.
 - [ ] Enter sleep with Word, Otzar HaHochma, Otzaria and a PDF reader open; resume before and after the scheduled end, then confirm each surviving exact-path window is restored from its card without a duplicate process.
 - [ ] Open and close Windows Settings before and during kiosk mode; verify kiosk exit never opens a cloaked or recycled system window.
+- [ ] Review all ten built-in background thumbnails and full-screen crops on monitors with different aspect ratios; confirm no people are visible in any source image.
 - [ ] Verify automatic opening at session end (including with kiosk dialogs open), hiding to tray, next automatic start, password-only opt-out and persisted expiry after reboot.
 - [ ] Test custom wallpaper selection, persistence when the original is moved, missing-image fallback and mixed-DPI secondary screens.
 - [ ] Verify elevated/secure Windows UI limitations are visible to operator.

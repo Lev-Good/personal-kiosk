@@ -20,12 +20,19 @@ public sealed class KioskVisualSettings
 
 public static class AppearancePolicy
 {
-    public static readonly string[] Themes = { "aurora", "midnight", "sand", "lake", "desert", "alps", "photo" };
+    public static readonly string[] Themes = { "aurora", "midnight", "sand", "lake", "desert", "mountainlake", "forest", "snow", "northern", "ocean", "tea", "mirrorlake", "moraine", "photo" };
     private static readonly Dictionary<string, string> BuiltInWallpapers = new()
     {
         ["lake"] = "PersonalKiosk.Assets.LandscapeLake.jpg",
         ["desert"] = "PersonalKiosk.Assets.LandscapeDesert.jpg",
-        ["alps"] = "PersonalKiosk.Assets.LandscapeAlps.jpg"
+        ["mountainlake"] = "PersonalKiosk.Assets.LandscapeMountainLake.jpg",
+        ["forest"] = "PersonalKiosk.Assets.LandscapeForest.jpg",
+        ["snow"] = "PersonalKiosk.Assets.LandscapeSnow.jpg",
+        ["northern"] = "PersonalKiosk.Assets.LandscapeAurora.jpg",
+        ["ocean"] = "PersonalKiosk.Assets.LandscapeOcean.jpg",
+        ["tea"] = "PersonalKiosk.Assets.LandscapeTea.jpg",
+        ["mirrorlake"] = "PersonalKiosk.Assets.LandscapeMirrorLake.jpg",
+        ["moraine"] = "PersonalKiosk.Assets.LandscapeMoraine.jpg"
     };
     public static bool Motion(KioskVisualSettings settings) => settings.AnimationsEnabled && SystemParameters.ClientAreaAnimation;
     public static void Validate(KioskVisualSettings? settings)

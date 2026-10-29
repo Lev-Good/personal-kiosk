@@ -12,10 +12,10 @@ Requires Windows x64 and .NET SDK 10. Run `pwsh -File ./build.ps1` from this dir
 
 Outputs in `dist/`:
 
-- `PersonalKiosk-1.5.0-win-x64/PersonalKioskSetup.exe`: per-user installer. Installer mode is selected by this exact filename or `--install`.
+- `PersonalKiosk-1.6.0-win-x64/PersonalKioskSetup.exe`: per-user installer. Installer mode is selected by this exact filename or `--install`.
 - `app/PersonalKiosk.exe`: portable application.
-- `PersonalKiosk-1.5.0-win-x64.zip`: distribution candidate, guide, licenses, test results and checksums.
-- `PersonalKiosk-1.5.0-source.zip`: source-only archive, without settings or build output.
+- `PersonalKiosk-1.6.0-win-x64.zip`: distribution candidate, guide, licenses, test results and checksums.
+- `PersonalKiosk-1.6.0-source.zip`: source-only archive, without settings or build output.
 
 The portable executable must stay at the same path while the kiosk is active; the startup registration and watchdog refer to that path. Installation places it under `%LOCALAPPDATA%\Programs\PersonalKiosk`.
 
@@ -77,6 +77,10 @@ The legacy settings tabs were replaced by a clean right-side navigation rail. Ea
 - The dashboard header always places the product logo/name at the far RTL start, followed by its actions.
 - Window restoration now rejects cloaked system windows and recycled window handles by verifying the original process ID and executable path before restoring a window. This addresses a case where Windows Settings could appear after leaving kiosk mode.
 - On resume from sleep, the app rechecks the scheduled deadline, rebuilds monitor shields and immediately refreshes the guard. Desktop applications normally retain their in-memory windows across sleep. Selecting an allowed app after resume now restores and activates its existing exact-path window when possible instead of always starting another process. A reboot, application crash/update or application-specific recovery behavior can still require reopening the app.
+
+## Version 1.6 landscape collection
+
+The built-in landscape selector now contains ten offline backgrounds, all visually inspected to contain no people: tropical lake, desert, mountain lake, forest waterfall, snowy mountains, northern lights, ocean sunset, tea fields, alpine lakes and Moraine Lake. The earlier Peyto Lake panorama containing visitors was removed from the project and executable rather than merely hidden. Every file is CC0 or public domain; exact authors, source pages and license terms are bundled in `LandscapeLicenses.txt`.
 
 ## Boundaries and release status
 
