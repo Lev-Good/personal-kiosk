@@ -22,7 +22,7 @@ internal static class PreviewRenderer
         Save(new ScrollViewer { Content = ScheduleEditor.Create(owner, schedule) }, Path.Combine(folder, "schedules.png"), 780, 900);
         Save(new ScrollViewer { Content = ScheduleEditor.Create(owner, new Settings { ScheduleEnabled = true, Schedules = new() { new WeeklySchedule { Name = "זמן כתיבה", Start = "13:00", End = "15:30" } } }, true) }, Path.Combine(folder, "availability.png"), 680, 650);
         var now = DateTime.Now.Date.AddHours(11).AddMinutes(24).AddSeconds(16);
-        foreach (var theme in new[] { "aurora", "midnight", "sand" })
+        foreach (var theme in new[] { "aurora", "midnight", "sand", "lake", "desert", "alps" })
         {
             var sample = new Settings { Apps = Discovery.Find(), KioskActive = true, ScheduleEnabled = true, SessionEndLocal = now.Date.AddHours(13), Schedules = new() { new WeeklySchedule { Name = "סדר א׳", Start = "09:00", End = "13:00", Days = new() { (int)now.DayOfWeek } } }, Appearance = new KioskVisualSettings { Theme = theme, AnimationsEnabled = false } };
             var kiosk = new MainWindow(new Store(), sample, true); kiosk.RenderAt(now); var content = (UIElement)kiosk.Content; kiosk.Content = null;

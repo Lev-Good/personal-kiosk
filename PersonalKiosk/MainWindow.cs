@@ -76,7 +76,8 @@ internal sealed class MainWindow : Window
         scheduleTimer.Tick += (_, _) => MaintenanceTick();
         updateTimer.Tick += (_, _) => { _ = CheckUpdatesAsync(false); };
         SystemEvents.DisplaySettingsChanged += DisplaysChanged;
-        Closed += (_, _) => { SystemEvents.DisplaySettingsChanged -= DisplaysChanged; clockTimer.Stop(); scheduleTimer.Stop(); updateTimer.Stop(); updateCancellation.Cancel(); noticeWindow?.Close(); tray?.Dispose(); guard?.Dispose(); CloseShields(); };
+        SystemEvents.PowerModeChanged += PowerModeChanged;
+        Closed += (_, _) => { SystemEvents.DisplaySettingsChanged -= DisplaysChanged; SystemEvents.PowerModeChanged -= PowerModeChanged; clockTimer.Stop(); scheduleTimer.Stop(); updateTimer.Stop(); updateCancellation.Cancel(); noticeWindow?.Close(); tray?.Dispose(); guard?.Dispose(); CloseShields(); };
     }
     internal void Reload(Settings updated) { bool channelChanged = settings.IncludePrereleaseUpdates != updated.IncludePrereleaseUpdates; settings = updated; if (channelChanged) { lastUpdateAttempt = null; updateStatus = ""; } scheduleError = ""; UpdateResidentMode(); Build(); Dispatcher.BeginInvoke(MaintenanceTick); _ = CheckUpdatesAsync(false); }
     private void UpdateResidentMode()
@@ -327,9 +328,23 @@ internal sealed class MainWindow : Window
             if (!File.Exists(app.Path)) throw new IOException("קובץ התוכנה לא נמצא. יש לעדכן אותו בהגדרות לאחר היציאה.");
             if (active && !FeaturePolicy.Available(app, DateTime.Now)) throw new IOException("התוכנה אינה זמינה בשעה זו לפי ההגדרות.");
             LowerShields();
+            if (file == null && ActivateExisting(app)) return;
             using var process = file == null ? Startup.Launch(app.Path) : Startup.Launch(app.Path, file);
         }
         catch (Exception ex) { Home(); Ui.Message(this, "לא ניתן לפתוח", ex.Message); }
+    }
+    private static bool ActivateExisting(AllowedApp app)
+    {
+        IntPtr candidate = IntPtr.Zero;
+        Native.EnumWindows((hwnd, _) =>
+        {
+            if (Native.IsCloaked(hwnd) || string.IsNullOrWhiteSpace(Native.Title(hwnd))) return true;
+            uint pid = Native.Pid(hwnd); if (pid == 0 || !Policy.SamePath(Native.Image(pid), app.Path)) return true;
+            candidate = hwnd; return false;
+        }, IntPtr.Zero);
+        if (candidate == IntPtr.Zero) return false;
+        if (Native.IsIconic(candidate)) Native.ShowWindow(candidate, 9);
+        Native.SetForegroundWindow(candidate); return true;
     }
     private void GuardFault(string message) { fault = message; Build(); Home(); }
     private void Home()
@@ -378,6 +393,17 @@ internal sealed class MainWindow : Window
     }
     private void CloseShields() { var wasExiting = exiting; exiting = true; foreach (var w in shields.ToArray()) w.Close(); shields.Clear(); secondaryClocks.Clear(); exiting = wasExiting; }
     private void DisplaysChanged(object? sender, EventArgs e) => Dispatcher.BeginInvoke(() => { if (active) { RebuildScreens(); Home(); } });
+    private void PowerModeChanged(object sender, PowerModeChangedEventArgs e)
+    {
+        if (e.Mode != PowerModes.Resume) return;
+        Dispatcher.BeginInvoke(() =>
+        {
+            if (exiting || sessionEnding) return;
+            TryAutomaticExit();
+            if (active) { RebuildScreens(); guard?.Refresh(); Build(); Home(); }
+            MaintenanceTick();
+        });
+    }
     private IntPtr WindowMessage(IntPtr hwnd, int msg, IntPtr wparam, IntPtr lparam, ref bool handled)
     {
         if (msg == 0x0011) { sessionEnding = true; if (active) { try { store.Save(settings); } catch { } } }

@@ -11,6 +11,8 @@ using System.Windows.Threading;
 using System.Windows.Media.Animation;
 using System.Windows.Media.Effects;
 using System.Windows.Markup;
+using System.Windows.Interop;
+using System.Windows.Media.Imaging;
 
 namespace PersonalKiosk;
 
@@ -94,6 +96,23 @@ internal static class Ui
         var border = new FrameworkElementFactory(typeof(Border)); border.Name = "Pill"; border.SetValue(Border.CornerRadiusProperty, new CornerRadius(8)); border.SetValue(Border.BackgroundProperty, Surface); border.SetValue(Border.BorderBrushProperty, Line); border.SetValue(Border.BorderThicknessProperty, new Thickness(1)); border.SetValue(Border.PaddingProperty, new Thickness(10, 7, 10, 7));
         var presenter = new FrameworkElementFactory(typeof(ContentPresenter)); presenter.SetValue(ContentPresenter.HorizontalAlignmentProperty, HorizontalAlignment.Center); presenter.SetValue(ContentPresenter.VerticalAlignmentProperty, VerticalAlignment.Center); border.AppendChild(presenter);
         var template = new ControlTemplate(typeof(CheckBox)) { VisualTree = border }; var selected = new Trigger { Property = ToggleButton.IsCheckedProperty, Value = true }; selected.Setters.Add(new Setter(Border.BackgroundProperty, AccentSoft, "Pill")); selected.Setters.Add(new Setter(Border.BorderBrushProperty, Accent, "Pill")); template.Triggers.Add(selected); check.Template = template; return check;
+    }
+    internal static Border AppBadge(AllowedApp app, double size = 44)
+    {
+        UIElement content;
+        try
+        {
+            using var icon = System.Drawing.Icon.ExtractAssociatedIcon(app.Path);
+            if (icon == null) throw new IOException();
+            var source = Imaging.CreateBitmapSourceFromHIcon(icon.Handle, Int32Rect.Empty, BitmapSizeOptions.FromWidthAndHeight((int)size - 12, (int)size - 12)); source.Freeze();
+            content = new Image { Source = source, Width = size - 12, Height = size - 12, Stretch = Stretch.Uniform };
+        }
+        catch
+        {
+            string letters = app.Name == "Word" ? "W" : app.Extensions.Contains(".pdf", StringComparison.OrdinalIgnoreCase) ? "PDF" : app.Name == "פנקס רשימות" ? "Aa" : app.Name.Trim().Length > 0 ? app.Name.Trim()[0].ToString() : "•";
+            content = new TextBlock { Text = letters, FontSize = letters.Length > 2 ? 12 : 18, FontWeight = FontWeights.SemiBold, Foreground = Accent, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
+        }
+        return new Border { Width = size, Height = size, CornerRadius = new CornerRadius(10), Background = AccentPale, Child = content, Margin = new Thickness(0, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
     }
     internal static Window Dialog(Window owner, string title, double width = 500, double height = 400)
     {
@@ -192,6 +211,7 @@ internal static class SettingsEditor
     internal static void Show(MainWindow owner, Settings original, Store store)
     {
         var copy = System.Text.Json.JsonSerializer.Deserialize<Settings>(System.Text.Json.JsonSerializer.Serialize(original))!;
+        bool manualUpdateChecked = false;
         var w = Ui.Dialog(owner, "הגדרות הקיוסק", Math.Min(1040, SystemParameters.WorkArea.Width - 40), Math.Min(780, SystemParameters.WorkArea.Height - 40));
         var outer = new DockPanel { Margin = new Thickness(24) };
         var bottom = new StackPanel { Orientation = Orientation.Horizontal };
@@ -204,8 +224,11 @@ internal static class SettingsEditor
                 SchedulePolicy.Validate(copy);
                 FeaturePolicy.Validate(copy); FeaturePolicy.ValidateHint(copy, copy.PasswordHint);
                 // A background check may complete while this settings copy is being edited.
-                if (copy.IncludePrereleaseUpdates == original.IncludePrereleaseUpdates) { copy.LastUpdateCheckUtc = original.LastUpdateCheckUtc; copy.LatestUpdateTag = original.LatestUpdateTag; copy.LatestUpdateUrl = original.LatestUpdateUrl; }
-                else { copy.LastUpdateCheckUtc = null; copy.LatestUpdateTag = ""; copy.LatestUpdateUrl = ""; }
+                if (!manualUpdateChecked)
+                {
+                    if (copy.IncludePrereleaseUpdates == original.IncludePrereleaseUpdates) { copy.LastUpdateCheckUtc = original.LastUpdateCheckUtc; copy.LatestUpdateTag = original.LatestUpdateTag; copy.LatestUpdateUrl = original.LatestUpdateUrl; }
+                    else { copy.LastUpdateCheckUtc = null; copy.LatestUpdateTag = ""; copy.LatestUpdateUrl = ""; }
+                }
                 try { Startup.Apply(copy); store.Save(copy); }
                 catch { try { Startup.Apply(original); } catch { } throw; }
                 owner.Reload(copy); w.DialogResult = true;
@@ -220,15 +243,19 @@ internal static class SettingsEditor
             list.Children.Clear();
             foreach (var app in copy.Apps.ToList())
             {
-                var row = new StackPanel(); var bar = new DockPanel();
-                var remove = Ui.Button("הסרה", () => { copy.Apps.Remove(app); Refresh(); }); DockPanel.SetDock(remove, Dock.Left); bar.Children.Add(remove);
-                var edit = Ui.Button("עריכה", () => { Edit(w, app, copy, Refresh); }); DockPanel.SetDock(edit, Dock.Left); bar.Children.Add(edit);
-                var up = Ui.Button("↑", () => { int i = copy.Apps.IndexOf(app); if (i > 0) { copy.Apps.RemoveAt(i); copy.Apps.Insert(i - 1, app); Refresh(); } }); DockPanel.SetDock(up, Dock.Left); bar.Children.Add(up);
-                bar.Children.Add(Ui.Text(app.Name, 18)); row.Children.Add(bar);
-                row.Children.Add(new TextBlock { Text = app.Path, TextWrapping = TextWrapping.Wrap, FlowDirection = FlowDirection.LeftToRight, Foreground = Ui.Muted, FontSize = 12 });
-                row.Children.Add(Ui.Text("סוגי קבצים: " + (string.IsNullOrWhiteSpace(app.Extensions) ? "הפעלה בלבד" : app.Extensions), 12, Ui.Muted));
-                if (app.TimeRestricted) row.Children.Add(Ui.Text("זמינות מוגבלת לפי ימים ושעות", 12, Ui.Accent));
-                list.Children.Add(Ui.Card(row));
+                int position = copy.Apps.IndexOf(app);
+                var row = new Grid(); row.ColumnDefinitions.Add(new ColumnDefinition()); row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                var identity = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+                identity.Children.Add(Ui.AppBadge(app));
+                var details = new StackPanel { Margin = new Thickness(12, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
+                details.Children.Add(Ui.Text(app.Name, 18)); details.Children.Add(new TextBlock { Text = app.Path, TextWrapping = TextWrapping.Wrap, FlowDirection = FlowDirection.LeftToRight, Foreground = Ui.Muted, FontSize = 12, MaxWidth = 430 });
+                details.Children.Add(Ui.Text("סוגי קבצים: " + (string.IsNullOrWhiteSpace(app.Extensions) ? "הפעלה בלבד" : app.Extensions) + (app.TimeRestricted ? " · זמינות מוגבלת" : ""), 12, app.TimeRestricted ? Ui.Accent : Ui.Muted)); identity.Children.Add(details); row.Children.Add(identity);
+                var controls = new WrapPanel { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(16, 0, 0, 0) };
+                controls.Children.Add(Ui.Button("עריכה", () => Edit(w, app, copy, Refresh)));
+                controls.Children.Add(Ui.Button("הסרה", () => { copy.Apps.Remove(app); Refresh(); }));
+                var up = Ui.Button("למעלה ↑", () => { int i = copy.Apps.IndexOf(app); if (i > 0) { copy.Apps.RemoveAt(i); copy.Apps.Insert(i - 1, app); Refresh(); } }); up.IsEnabled = position > 0; controls.Children.Add(up);
+                var down = Ui.Button("למטה ↓", () => { int i = copy.Apps.IndexOf(app); if (i >= 0 && i < copy.Apps.Count - 1) { copy.Apps.RemoveAt(i); copy.Apps.Insert(i + 1, app); Refresh(); } }); down.IsEnabled = position < copy.Apps.Count - 1; controls.Children.Add(down);
+                Grid.SetColumn(controls, 1); row.Children.Add(controls); list.Children.Add(Ui.Card(row));
             }
         }
         Refresh(); p.Children.Add(list);
@@ -247,7 +274,25 @@ internal static class SettingsEditor
         extras.Children.Add(Ui.SettingRow("רמז לסיסמה", "אופציונלי, נשמר כטקסט גלוי. אין להזין בו את הסיסמה עצמה.", hint));
         extras.Children.Add(Ui.SettingRow("בדיקת עדכונים אוטומטית", "בדיקה בפתיחה ואחת ליום בזמן שהתוכנה פועלת.", Ui.Toggle(copy.AutoCheckUpdates, value => copy.AutoCheckUpdates = value)));
         extras.Children.Add(Ui.SettingRow("גרסאות ניסיון", "הצגת עדכונים מערוץ גרסאות הניסיון בנוסף לגרסאות יציבות.", Ui.Toggle(copy.IncludePrereleaseUpdates, value => copy.IncludePrereleaseUpdates = value)));
-        extras.Children.Add(Ui.Card(Ui.Text("הבדיקה פונה ל־GitHub כדי לקרוא פרטי מהדורות. לא נשלחים הגדרות, סיסמה או רמז, ולא מתבצעת התקנה אוטומטית. אפשר לבדוק ידנית בכפתור „עדכונים” במסך הבית.", 14, Ui.Muted)));
+        var updateStatus = Ui.Text(copy.LastUpdateCheckUtc.HasValue ? "בדיקה אחרונה: " + copy.LastUpdateCheckUtc.Value.ToLocalTime().ToString("dd/MM/yyyy HH:mm") : "עדיין לא בוצעה בדיקה ידנית.", 13, Ui.Muted);
+        var downloadUpdate = Ui.Button("פתיחת דף ההורדה", () => { try { if (UpdatePolicy.TrustedReleaseUrl(copy.LatestUpdateUrl)) Brand.OpenLink(copy.LatestUpdateUrl); } catch (Exception ex) { Ui.Message(w, "לא ניתן לפתוח", ex.Message); } }, true); downloadUpdate.Visibility = UpdatePolicy.Newer(copy.LatestUpdateTag, BuildInfo.ReleaseVersion) ? Visibility.Visible : Visibility.Collapsed;
+        var checkUpdate = Ui.Button("בדיקה כעת", () => { });
+        checkUpdate.Click += async (_, _) =>
+        {
+            checkUpdate.IsEnabled = false; updateStatus.Text = "בודק עדכונים…";
+            try
+            {
+                var result = await UpdatePolicy.FetchAsync(copy.IncludePrereleaseUpdates);
+                manualUpdateChecked = true; copy.LastUpdateCheckUtc = DateTimeOffset.UtcNow; copy.LatestUpdateTag = result?.Tag ?? ""; copy.LatestUpdateUrl = result?.Url ?? "";
+                bool newer = result != null && UpdatePolicy.Newer(result.Tag, BuildInfo.ReleaseVersion);
+                updateStatus.Text = newer ? "זמינה גרסה חדשה: " + result!.Tag : result == null ? "לא נמצאה מהדורה מתאימה בערוץ שנבחר." : "מותקנת הגרסה העדכנית ביותר."; downloadUpdate.Visibility = newer ? Visibility.Visible : Visibility.Collapsed;
+            }
+            catch (Exception) { updateStatus.Text = "בדיקת העדכונים לא הושלמה. יש לבדוק את החיבור ולנסות שוב."; }
+            finally { checkUpdate.IsEnabled = true; }
+        };
+        var updateActions = new WrapPanel(); updateActions.Children.Add(checkUpdate); updateActions.Children.Add(downloadUpdate);
+        var updatePanel = new StackPanel(); updatePanel.Children.Add(updateStatus); updatePanel.Children.Add(updateActions); extras.Children.Add(Ui.SettingRow("בדיקת עדכונים ידנית", "הבדיקה משתמשת בערוץ שנבחר לעיל ונשמרת בעת שמירת ההגדרות.", updatePanel));
+        extras.Children.Add(Ui.Card(Ui.Text("הבדיקה פונה ל־GitHub כדי לקרוא פרטי מהדורות. לא נשלחים הגדרות, סיסמה או רמז, ולא מתבצעת התקנה אוטומטית.", 14, Ui.Muted)));
         extras.Children.Add(Ui.BrandFooter(w, true, copy.Appearance.AnimationsEnabled));
         var pages = new UIElement[] { Ui.Scroll(p), Ui.Scroll(ScheduleEditor.Create(w, copy)), Ui.Scroll(AppearanceEditor.Create(w, copy)), Ui.Scroll(extras) };
         var shell = new Grid { Margin = new Thickness(0, 0, 0, 12) }; shell.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(190) }); shell.ColumnDefinitions.Add(new ColumnDefinition());

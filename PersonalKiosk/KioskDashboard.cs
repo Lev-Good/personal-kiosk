@@ -26,20 +26,20 @@ internal sealed class KioskDashboard
         bool animate = AppearancePolicy.Motion(settings.Appearance);
         View = DashboardUi.Background(settings.Appearance);
         var root = new DockPanel { Margin = new Thickness(32, 24, 32, 20) }; View.Children.Add(root);
-        var header = new DockPanel { Margin = new Thickness(0, 0, 0, 18) }; DockPanel.SetDock(header, Dock.Top); root.Children.Add(header);
-        var actions = new WrapPanel { VerticalAlignment = VerticalAlignment.Center }; DockPanel.SetDock(actions, Dock.Left); header.Children.Add(actions);
+        var header = new Grid { Margin = new Thickness(0, 0, 0, 18), FlowDirection = FlowDirection.LeftToRight }; header.ColumnDefinitions.Add(new ColumnDefinition()); header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto }); DockPanel.SetDock(header, Dock.Top); root.Children.Add(header);
+        var actions = new WrapPanel { VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Right, FlowDirection = FlowDirection.RightToLeft }; header.Children.Add(actions);
         void Command(string title, Action action, bool primary = false)
         {
             var b = DashboardUi.Tile(DashboardUi.Text(title, 14, palette.Ink), action, palette, animate, 0); b.Width = double.NaN; b.Height = 43; b.Padding = new Thickness(14, 9, 14, 9); actions.Children.Add(b);
             if (primary) { b.Background = Ui.Accent; b.BorderBrush = Ui.Accent; ((TextBlock)b.Content).Foreground = Brushes.White; }
         }
         if (kiosk) Command("יציאה מהקיוסק", commands.Exit);
-        else { Command("הפעלת הקיוסק", commands.Start, true); Command("הגדרות", commands.Settings); Command("עדכונים", commands.Updates); }
+        else { Command("הפעלת הקיוסק", commands.Start, true); Command("הגדרות", commands.Settings); }
         Command("עזרה", commands.Help);
-        var heading = new StackPanel(); var name = new WrapPanel { VerticalAlignment = VerticalAlignment.Center };
+        var heading = new StackPanel { FlowDirection = FlowDirection.RightToLeft }; var name = new WrapPanel { VerticalAlignment = VerticalAlignment.Center };
         name.Children.Add(new Border { CornerRadius = new CornerRadius(10), Padding = new Thickness(3), Background = Brushes.White, Child = new LogoImage(42, animate), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 10, 0) });
         name.Children.Add(DashboardUi.Text("קיוסק אישי", 29, palette.Ink)); heading.Children.Add(name);
-        heading.Children.Add(DashboardUi.Text(preview ? "תצוגה מקדימה · ללא חסימה" : kiosk ? "●  מרחב העבודה שלך פתוח ללימוד" : "מרחב עבודה ממוקד, בקצב שלך", 13, palette.Muted)); header.Children.Add(heading);
+        heading.Children.Add(DashboardUi.Text(preview ? "תצוגה מקדימה · ללא חסימה" : kiosk ? "●  מרחב העבודה שלך פתוח ללימוד" : "מרחב עבודה ממוקד, בקצב שלך", 13, palette.Muted)); Grid.SetColumn(heading, 1); header.Children.Add(heading);
 
         var footer = new Grid { Margin = new Thickness(0, 15, 0, 0), FlowDirection = FlowDirection.LeftToRight }; footer.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto }); footer.ColumnDefinitions.Add(new ColumnDefinition()); footer.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto }); DockPanel.SetDock(footer, Dock.Bottom); root.Children.Add(footer);
         var version = DashboardUi.Text("גרסה " + BuildInfo.Version + (kiosk ? "\nCtrl + Alt + Home" : "\nWindows 10 / 11"), 11, palette.Muted); version.VerticalAlignment = VerticalAlignment.Center; footer.Children.Add(version);

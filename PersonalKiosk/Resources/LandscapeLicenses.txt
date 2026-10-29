@@ -1,0 +1,30 @@
+Bundled landscape images
+========================
+
+The following images are embedded for offline background selection. They are
+not owned by Lev Tov Digital. Each source page was checked on 29 October 2026.
+
+LandscapeLake.jpg
+Title: Scenic view of lake with mountains
+Author: Karthika Manikandan
+Source: https://commons.wikimedia.org/wiki/File:Scenic_view_of_lake_with_mountains.jpg
+License: Creative Commons CC0 1.0 Universal Public Domain Dedication
+License URL: https://creativecommons.org/publicdomain/zero/1.0/
+
+LandscapeDesert.jpg
+Title: American Desert
+Author: Alanthebox
+Source: https://commons.wikimedia.org/wiki/File:American_Desert.JPG
+License: Creative Commons CC0 1.0 Universal Public Domain Dedication
+License URL: https://creativecommons.org/publicdomain/zero/1.0/
+Bundled copy: Wikimedia's 1280-pixel derivative of the source image.
+
+LandscapeAlps.jpg
+Title: PeytoLakePanorama
+Author: Laszlo van den Hoek
+Source: https://commons.wikimedia.org/wiki/File:PeytoLakePanorama.jpg
+License: Released into the public domain by the copyright holder (PD-self)
+Bundled copy: current Wikimedia Commons file, a stitched panorama.
+
+Wikimedia Commons hosts the source files and is not affiliated with or an
+endorser of PersonalKiosk or Lev Tov Digital.

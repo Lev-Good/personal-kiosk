@@ -20,7 +20,13 @@ public sealed class KioskVisualSettings
 
 public static class AppearancePolicy
 {
-    public static readonly string[] Themes = { "aurora", "midnight", "sand", "photo" };
+    public static readonly string[] Themes = { "aurora", "midnight", "sand", "lake", "desert", "alps", "photo" };
+    private static readonly Dictionary<string, string> BuiltInWallpapers = new()
+    {
+        ["lake"] = "PersonalKiosk.Assets.LandscapeLake.jpg",
+        ["desert"] = "PersonalKiosk.Assets.LandscapeDesert.jpg",
+        ["alps"] = "PersonalKiosk.Assets.LandscapeAlps.jpg"
+    };
     public static bool Motion(KioskVisualSettings settings) => settings.AnimationsEnabled && SystemParameters.ClientAreaAnimation;
     public static void Validate(KioskVisualSettings? settings)
     {
@@ -43,6 +49,17 @@ public static class AppearancePolicy
             var bitmap = new BitmapImage(); bitmap.BeginInit(); bitmap.CacheOption = BitmapCacheOption.OnLoad; bitmap.DecodePixelWidth = Math.Min(width, 2048); bitmap.StreamSource = stream; bitmap.EndInit(); bitmap.Freeze(); return bitmap;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException or ArgumentException or System.Runtime.InteropServices.COMException or System.IO.FileFormatException) { return null; }
+    }
+    public static BitmapSource? LoadBuiltInWallpaper(string theme)
+    {
+        if (!BuiltInWallpapers.TryGetValue(theme, out var resourceName)) return null;
+        try
+        {
+            using var stream = typeof(AppearancePolicy).Assembly.GetManifestResourceStream(resourceName);
+            if (stream == null) return null;
+            var bitmap = new BitmapImage(); bitmap.BeginInit(); bitmap.CacheOption = BitmapCacheOption.OnLoad; bitmap.DecodePixelWidth = 2048; bitmap.StreamSource = stream; bitmap.EndInit(); bitmap.Freeze(); return bitmap;
+        }
+        catch (Exception ex) when (ex is IOException or NotSupportedException or ArgumentException or System.Runtime.InteropServices.COMException or FileFormatException) { return null; }
     }
     public static string ImportWallpaper(string source, string? destinationDirectory = null)
     {
@@ -78,11 +95,11 @@ internal static class DashboardUi
         string first = settings.Theme == "midnight" ? "#0B1426" : settings.Theme == "sand" ? "#FAF5E9" : "#F8FAFC";
         string last = settings.Theme == "midnight" ? "#1A3147" : settings.Theme == "sand" ? "#EEEDE2" : "#F0FDFA";
         grid.Background = new LinearGradientBrush((Color)ColorConverter.ConvertFromString(first), (Color)ColorConverter.ConvertFromString(last), new Point(1, 0), new Point(0, 1));
-        var wallpaper = settings.Theme == "photo" ? AppearancePolicy.LoadWallpaper(settings.BackgroundImagePath) : null;
+        var wallpaper = settings.Theme == "photo" ? AppearancePolicy.LoadWallpaper(settings.BackgroundImagePath) : AppearancePolicy.LoadBuiltInWallpaper(settings.Theme);
         if (wallpaper != null)
         {
             grid.Children.Add(new Image { Source = wallpaper, Stretch = Stretch.UniformToFill, IsHitTestVisible = false });
-            grid.Children.Add(new Border { Background = KioskPalette.Brush("#B8EAF1F5"), IsHitTestVisible = false });
+            grid.Children.Add(new Border { Background = KioskPalette.Brush(settings.Theme == "photo" ? "#A8EAF1F5" : "#70F8FAFC"), IsHitTestVisible = false });
         }
         else
         {

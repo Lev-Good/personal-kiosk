@@ -1,11 +1,11 @@
-# Release verification — PersonalKiosk 1.4.0
+# Release verification — PersonalKiosk 1.5.0
 
 Status: packaged release candidate; NOT certified for unrestricted distribution.
 
 ## Completed
 
 - Self-contained Windows x64 release build.
-- 146 automated checks pass. New checks cover session start/end and persisted deadlines, exact end boundary, restart/wake expiry detection, no early unlocking, overlap/touching/week-boundary merging, full-week continuous coverage, late automatic end preserving the next occurrence, manual entry without a deadline, password-only mode, countdown formatting, wallpaper import/fallback/persistence and the exact original logo hash with all 76 frames. Existing password, file, scheduling, update and hint checks remain passing. Bar-Ilan discovery uses inert fixtures, not an installed copy.
+- 151 automated checks pass. New checks cover all three embedded landscape backgrounds, their bundled licensing resource, and exact process identity matching that prevents recycled handles from restoring the wrong window. Existing session, password, file, scheduling, update, hint, wallpaper and 76-frame logo checks remain passing. Bar-Ilan discovery uses inert fixtures, not an installed copy.
 - The updater was checked against the real public GitHub API in the previous release. This release continues using the same bounded, read-only transport; no settings are sent by a probe.
 - The Fluent-style light/dark/warm kiosk layouts, primary action, 44×44 program icons, thin scrollbars, toggle rows, centered live-clock/countdown values, logo placements, schedule and appearance settings were rendered off-screen in WPF and visually inspected. This does not replace real-time animation and desktop interaction checks.
 - Runtime package vulnerability advisory lookup was unavailable because the NuGet service could not be reached. Compilation and local checks passed; no successful online vulnerability audit is claimed.
@@ -34,6 +34,8 @@ Status: packaged release candidate; NOT certified for unrestricted distribution.
 - [ ] Verify automatic and manual update UI with a newer release, stable/prerelease filtering, offline failure and browser download link; no automatic installation.
 - [ ] Verify hint reveal, hint removal, password change and all creator/homepage placements in the installed app.
 - [ ] Verify one-second clock/date updates, countdown and frame-by-frame GIF animation on actual monitors, including reduced-motion behavior and hidden/background states.
+- [ ] Enter sleep with Word, Otzar HaHochma, Otzaria and a PDF reader open; resume before and after the scheduled end, then confirm each surviving exact-path window is restored from its card without a duplicate process.
+- [ ] Open and close Windows Settings before and during kiosk mode; verify kiosk exit never opens a cloaked or recycled system window.
 - [ ] Verify automatic opening at session end (including with kiosk dialogs open), hiding to tray, next automatic start, password-only opt-out and persisted expiry after reboot.
 - [ ] Test custom wallpaper selection, persistence when the original is moved, missing-image fallback and mixed-DPI secondary screens.
 - [ ] Verify elevated/secure Windows UI limitations are visible to operator.

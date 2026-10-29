@@ -65,7 +65,9 @@ internal static class SelfTest
             Check("untrusted Notepad package rejected", () => !Policy.AllowedImage(notepad, Path.Combine(packages, "Microsoft.WindowsNotepad_11.0.0.0_x64__untrusted", "Notepad", "Notepad.exe")));
             Check("same filename outside configured path rejected", () => !Policy.AllowedImage(reader, Path.Combine(dir, Path.GetFileName(reader.Path))));
             Check("empty image is rejected", () => !Policy.AllowedImage(reader, ""));
-            Check("embedded installer resources exist", () => new[] { "RuntimeLicense.txt", "RuntimeNotices.txt", "DesktopLicense.txt", "Rights.txt", "Guide.md" }.All(file => System.Reflection.Assembly.GetExecutingAssembly().GetManifestResourceNames().Contains("PersonalKiosk.Resources." + file)));
+            Check("embedded installer resources exist", () => new[] { "RuntimeLicense.txt", "RuntimeNotices.txt", "DesktopLicense.txt", "Rights.txt", "Guide.md", "LandscapeLicenses.txt" }.All(file => System.Reflection.Assembly.GetExecutingAssembly().GetManifestResourceNames().Contains("PersonalKiosk.Resources." + file)));
+            Check("window restore accepts original process identity", () => Guard.SameIdentity(42, @"C:\Windows\app.exe", 42, @"c:\windows\APP.exe"));
+            Check("window restore rejects recycled handles", () => !Guard.SameIdentity(42, @"C:\Windows\app.exe", 43, @"C:\Windows\app.exe") && !Guard.SameIdentity(42, @"C:\Windows\app.exe", 42, @"C:\Windows\other.exe"));
             var seder = new WeeklySchedule { Name = "סדר א׳", Start = "09:00", End = "13:00", Days = new() { 0 } };
             var sunday = new DateTime(2026, 10, 25);
             var scheduled = new Settings { ScheduleEnabled = true, PasswordHash = settings.PasswordHash, Salt = settings.Salt, Schedules = new() { seder }, Apps = new() { reader } };
@@ -219,6 +221,9 @@ internal static class SelfTest
             Check("countdown supports more than 24 hours", () => SessionPolicy.Countdown(TimeSpan.FromHours(27) + TimeSpan.FromMinutes(8) + TimeSpan.FromSeconds(9)) == "27:08:09");
             Check("invalid visual theme rejected", () => { try { AppearancePolicy.Validate(new KioskVisualSettings { Theme = "unknown" }); return false; } catch (IOException) { return true; } });
             Check("photo theme requires image selection", () => { try { AppearancePolicy.Validate(new KioskVisualSettings { Theme = "photo" }); return false; } catch (IOException) { return true; } });
+            Check("bundled lake background loads offline", () => AppearancePolicy.LoadBuiltInWallpaper("lake") is { PixelWidth: > 1000, PixelHeight: > 400 });
+            Check("bundled desert background loads offline", () => AppearancePolicy.LoadBuiltInWallpaper("desert") is { PixelWidth: >= 1200, PixelHeight: >= 600 });
+            Check("bundled panorama background loads offline", () => AppearancePolicy.LoadBuiltInWallpaper("alps") is { PixelWidth: >= 2000, PixelHeight: > 300 });
             Check("missing wallpaper returns safe fallback", () => AppearancePolicy.LoadWallpaper(Path.Combine(dir, "missing.png")) == null);
             var pngPath = Path.Combine(dir, "wallpaper.png");
             var pngEncoder = new System.Windows.Media.Imaging.PngBitmapEncoder(); pngEncoder.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(System.Windows.Media.Imaging.BitmapSource.Create(2, 2, 96, 96, System.Windows.Media.PixelFormats.Bgra32, null, new byte[16], 8)));

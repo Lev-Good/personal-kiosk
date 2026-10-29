@@ -18,7 +18,7 @@ internal sealed class Guard : IDisposable
     private readonly Native.KeyboardProc callback;
     private IntPtr hook;
     private bool busy, disposed;
-    private readonly HashSet<IntPtr> minimized = new();
+    private readonly Dictionary<IntPtr, (uint Pid, string Image)> minimized = new();
     private readonly HashSet<IntPtr> approvedDialogs = new();
     private readonly Dictionary<uint, (string Image, DateTime Until)> images = new();
     private uint pendingPid;
@@ -66,7 +66,7 @@ internal sealed class Guard : IDisposable
                 if (cls is "Shell_TrayWnd" or "Shell_SecondaryTrayWnd" or "Progman" or "WorkerW") continue;
                 if (!Allowed(pid))
                 {
-                    if (!string.IsNullOrEmpty(Native.Title(hwnd))) { Native.ShowWindow(hwnd, 6); minimized.Add(hwnd); }
+                    if (!Native.IsCloaked(hwnd) && !string.IsNullOrEmpty(Native.Title(hwnd))) { string image = Image(pid); Native.ShowWindow(hwnd, 6); minimized[hwnd] = (pid, image); }
                     continue;
                 }
                 if (settings.GateDialogs && Dialog(hwnd) && !approvedDialogs.Contains(hwnd))
@@ -89,6 +89,9 @@ internal sealed class Guard : IDisposable
         }
         catch (Exception ex) { timer.Stop(); fault("ניטור החלונות נעצר: " + ex.Message); }
     }
+    internal void Refresh() => Tick();
+    internal static bool SameIdentity(uint expectedPid, string expectedImage, uint actualPid, string actualImage)
+        => expectedPid != 0 && !string.IsNullOrWhiteSpace(expectedImage) && expectedPid == actualPid && string.Equals(expectedImage, actualImage, StringComparison.OrdinalIgnoreCase);
     private void GateDialog(IntPtr hwnd)
     {
         busy = true;
@@ -145,7 +148,11 @@ internal sealed class Guard : IDisposable
     {
         if (disposed) return;
         disposed = true; timer.Stop(); if (hook != IntPtr.Zero) Native.UnhookWindowsHookEx(hook);
-        foreach (var hwnd in minimized) if (Native.IsWindow(hwnd)) Native.ShowWindow(hwnd, 4);
+        foreach (var entry in minimized)
+        {
+            var hwnd = entry.Key; var identity = entry.Value;
+            if (Native.IsWindow(hwnd) && SameIdentity(identity.Pid, identity.Image, Native.Pid(hwnd), Native.Image(Native.Pid(hwnd))) && Native.IsIconic(hwnd)) Native.ShowWindow(hwnd, 4);
+        }
         minimized.Clear();
     }
 }

@@ -19,6 +19,7 @@ internal static class Native
     [DllImport("user32.dll")] internal static extern bool IsWindowVisible(IntPtr hwnd);
     [DllImport("user32.dll")] internal static extern bool IsWindow(IntPtr hwnd);
     [DllImport("user32.dll")] internal static extern bool IsIconic(IntPtr hwnd);
+    [DllImport("dwmapi.dll")] private static extern int DwmGetWindowAttribute(IntPtr hwnd, int attribute, out int value, int size);
     [DllImport("user32.dll")] internal static extern bool ShowWindow(IntPtr hwnd, int command);
     [DllImport("user32.dll")] internal static extern uint GetWindowThreadProcessId(IntPtr hwnd, out uint pid);
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] internal static extern int GetClassName(IntPtr hwnd, StringBuilder name, int count);
@@ -44,6 +45,7 @@ internal static class Native
     internal static string Class(IntPtr hwnd) { var text = new StringBuilder(256); GetClassName(hwnd, text, text.Capacity); return text.ToString(); }
     internal static string Title(IntPtr hwnd) { var text = new StringBuilder(512); GetWindowText(hwnd, text, text.Capacity); return text.ToString(); }
     internal static uint Pid(IntPtr hwnd) { GetWindowThreadProcessId(hwnd, out var pid); return pid; }
+    internal static bool IsCloaked(IntPtr hwnd) => DwmGetWindowAttribute(hwnd, 14, out int cloaked, sizeof(int)) == 0 && cloaked != 0;
     internal static string Image(uint pid)
     {
         var handle = OpenProcess(0x1000, false, pid);

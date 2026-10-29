@@ -12,10 +12,10 @@ Requires Windows x64 and .NET SDK 10. Run `pwsh -File ./build.ps1` from this dir
 
 Outputs in `dist/`:
 
-- `PersonalKiosk-1.4.0-win-x64/PersonalKioskSetup.exe`: per-user installer. Installer mode is selected by this exact filename or `--install`.
+- `PersonalKiosk-1.5.0-win-x64/PersonalKioskSetup.exe`: per-user installer. Installer mode is selected by this exact filename or `--install`.
 - `app/PersonalKiosk.exe`: portable application.
-- `PersonalKiosk-1.4.0-win-x64.zip`: distribution candidate, guide, licenses, test results and checksums.
-- `PersonalKiosk-1.4.0-source.zip`: source-only archive, without settings or build output.
+- `PersonalKiosk-1.5.0-win-x64.zip`: distribution candidate, guide, licenses, test results and checksums.
+- `PersonalKiosk-1.5.0-source.zip`: source-only archive, without settings or build output.
 
 The portable executable must stay at the same path while the kiosk is active; the startup registration and watchdog refer to that path. Installation places it under `%LOCALAPPDATA%\Programs\PersonalKiosk`.
 
@@ -68,6 +68,15 @@ The one-second UI timer updates existing text controls instead of rebuilding the
 The complete WPF interface now shares one RTL-first design system: `#F8FAFC` window backgrounds, white 12-pixel cards, `#E2E8F0` borders, deep-teal `#0F766E` actions and pale-teal secondary surfaces. Buttons, fields, password dialogs, installer and settings use the same Windows 11-inspired sizing, typography and hover states. Scroll viewers use a rounded 6-pixel track without arrow buttons.
 
 The legacy settings tabs were replaced by a clean right-side navigation rail. Each setting is presented as a compact title/description/action row; Boolean options use accessible toggle switches and day selection uses compact selection pills. The primary kiosk action is visually distinct. Program cards now include a 44×44 teal icon tile, pointer cursor, teal hover border, lift and shadow. Hebrew text wraps in RTL and action controls retain content-sized widths.
+
+## Version 1.5 refinements
+
+- Manual update checking and the trusted release link now live directly in the protected password/update settings page. The main header remains focused on kiosk activation, settings and help.
+- Three offline landscape backgrounds are embedded in the executable, with thumbnail selection and bundled source/license information in `LandscapeLicenses.txt`: two CC0 images and one public-domain panorama from Wikimedia Commons.
+- Allowed-app settings rows show the executable icon and name on the RTL start side, actions on the opposite side, and both upward and downward ordering controls.
+- The dashboard header always places the product logo/name at the far RTL start, followed by its actions.
+- Window restoration now rejects cloaked system windows and recycled window handles by verifying the original process ID and executable path before restoring a window. This addresses a case where Windows Settings could appear after leaving kiosk mode.
+- On resume from sleep, the app rechecks the scheduled deadline, rebuilds monitor shields and immediately refreshes the guard. Desktop applications normally retain their in-memory windows across sleep. Selecting an allowed app after resume now restores and activates its existing exact-path window when possible instead of always starting another process. A reboot, application crash/update or application-specific recovery behavior can still require reopening the app.
 
 ## Boundaries and release status
 

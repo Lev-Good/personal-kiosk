@@ -36,7 +36,7 @@ internal sealed class InstallerWindow : Window
             if (!Environment.Is64BitOperatingSystem) throw new IOException("גרסה זו מיועדת למערכת Windows של 64 סיביות.");
             Directory.CreateDirectory(InstallDir);
             if (!Policy.SamePath(Environment.ProcessPath!, InstalledExe)) File.Copy(Environment.ProcessPath!, InstalledExe, true);
-            foreach (var file in new[] { "RuntimeLicense.txt", "RuntimeNotices.txt", "DesktopLicense.txt", "Rights.txt", "Guide.md" })
+            foreach (var file in new[] { "RuntimeLicense.txt", "RuntimeNotices.txt", "DesktopLicense.txt", "Rights.txt", "Guide.md", "LandscapeLicenses.txt" })
             {
                 using var resource = System.Reflection.Assembly.GetExecutingAssembly().GetManifestResourceStream("PersonalKiosk.Resources." + file) ?? throw new IOException("משאב התקנה חסר: " + file);
                 using var target = File.Create(Path.Combine(InstallDir, file)); resource.CopyTo(target);
@@ -77,7 +77,7 @@ internal sealed class InstallerWindow : Window
                 "$expected = Join-Path ([Environment]::GetFolderPath('LocalApplicationData')) 'Programs\\PersonalKiosk'\n" +
                 "if ([IO.Path]::GetFullPath($target) -ne [IO.Path]::GetFullPath($expected)) { throw 'Unexpected target' }\n" +
                 "Remove-Item -LiteralPath (Join-Path $target 'PersonalKiosk.exe') -Force -ErrorAction SilentlyContinue\n" +
-                "foreach ($file in @('RuntimeLicense.txt','RuntimeNotices.txt','DesktopLicense.txt','Rights.txt','Guide.md')) { Remove-Item -LiteralPath (Join-Path $target $file) -Force -ErrorAction SilentlyContinue }\n" +
+                "foreach ($file in @('RuntimeLicense.txt','RuntimeNotices.txt','DesktopLicense.txt','Rights.txt','Guide.md','LandscapeLicenses.txt')) { Remove-Item -LiteralPath (Join-Path $target $file) -Force -ErrorAction SilentlyContinue }\n" +
                 "if ((Get-ChildItem -LiteralPath $target -Force | Measure-Object).Count -eq 0) { Remove-Item -LiteralPath $target -Force }\n" +
                 "Remove-Item -LiteralPath " + Quote(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), "קיוסק אישי.lnk")) + " -Force -ErrorAction SilentlyContinue\n" +
                 "Remove-Item -LiteralPath " + Quote(Path.Combine(menu, "קיוסק אישי.lnk")) + " -Force -ErrorAction SilentlyContinue\n" +
