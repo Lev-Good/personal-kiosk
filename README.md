@@ -12,10 +12,10 @@ Requires Windows x64 and .NET SDK 10. Run `pwsh -File ./build.ps1` from this dir
 
 Outputs in `dist/`:
 
-- `PersonalKiosk-1.3.0-win-x64/PersonalKioskSetup.exe`: per-user installer. Installer mode is selected by this exact filename or `--install`.
+- `PersonalKiosk-1.4.0-win-x64/PersonalKioskSetup.exe`: per-user installer. Installer mode is selected by this exact filename or `--install`.
 - `app/PersonalKiosk.exe`: portable application.
-- `PersonalKiosk-1.3.0-win-x64.zip`: distribution candidate, guide, licenses, test results and checksums.
-- `PersonalKiosk-1.3.0-source.zip`: source-only archive, without settings or build output.
+- `PersonalKiosk-1.4.0-win-x64.zip`: distribution candidate, guide, licenses, test results and checksums.
+- `PersonalKiosk-1.4.0-source.zip`: source-only archive, without settings or build output.
 
 The portable executable must stay at the same path while the kiosk is active; the startup registration and watchdog refer to that path. Installation places it under `%LOCALAPPDATA%\Programs\PersonalKiosk`.
 
@@ -62,6 +62,12 @@ When schedules are enabled, the normal Close button hides to a tray icon and HKC
 `SessionPolicy.cs`: merge overlapping and touching weekly intervals, including midnight and week boundaries; full-week continuous coverage has no artificial finite deadline. Persist the session deadline at entry and preserve it on resume. Default automatic end unlocks without a password, restores minimized windows, closes only kiosk-owned dialogs and hides the kiosk to its existing tray runner until the next session. Manual entry outside an active schedule has no automatic deadline. Password-only ending remains selectable in protected appearance settings. A late automatic end does not mark a future occurrence handled. Failed persistence leaves the existing restriction in place and reports an error.
 
 The one-second UI timer updates existing text controls instead of rebuilding the dashboard, and checks automatic end independently of the ten-second activation timer. Off-screen previews cover light/dark/warm kiosk states, countdown and appearance settings without activating restrictions.
+
+## Version 1.4 Fluent interface
+
+The complete WPF interface now shares one RTL-first design system: `#F8FAFC` window backgrounds, white 12-pixel cards, `#E2E8F0` borders, deep-teal `#0F766E` actions and pale-teal secondary surfaces. Buttons, fields, password dialogs, installer and settings use the same Windows 11-inspired sizing, typography and hover states. Scroll viewers use a rounded 6-pixel track without arrow buttons.
+
+The legacy settings tabs were replaced by a clean right-side navigation rail. Each setting is presented as a compact title/description/action row; Boolean options use accessible toggle switches and day selection uses compact selection pills. The primary kiosk action is visually distinct. Program cards now include a 44×44 teal icon tile, pointer cursor, teal hover border, lift and shadow. Hebrew text wraps in RTL and action controls retain content-sized widths.
 
 ## Boundaries and release status
 

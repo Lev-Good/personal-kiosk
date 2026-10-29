@@ -4,45 +4,116 @@ using System.IO;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Media;
 using System.Windows.Input;
 using System.Windows.Threading;
+using System.Windows.Media.Animation;
+using System.Windows.Media.Effects;
+using System.Windows.Markup;
 
 namespace PersonalKiosk;
 
 internal static class Ui
 {
-    internal static readonly Brush Ink = new SolidColorBrush(Color.FromRgb(26, 43, 62));
-    internal static readonly Brush Muted = new SolidColorBrush(Color.FromRgb(99, 114, 131));
-    internal static readonly Brush Accent = new SolidColorBrush(Color.FromRgb(28, 105, 97));
-    internal static readonly Brush Background = new SolidColorBrush(Color.FromRgb(244, 247, 249));
+    internal static readonly Brush Ink = Brush("#0F172A");
+    internal static readonly Brush Muted = Brush("#64748B");
+    internal static readonly Brush Accent = Brush("#0F766E");
+    internal static readonly Brush AccentSoft = Brush("#F0FDFA");
+    internal static readonly Brush AccentPale = Brush("#CCFBF1");
+    internal static readonly Brush Background = Brush("#F8FAFC");
+    internal static readonly Brush Surface = Brush("#FFFFFF");
+    internal static readonly Brush Line = Brush("#E2E8F0");
+    private static SolidColorBrush Brush(string value) { var b = new SolidColorBrush((Color)ColorConverter.ConvertFromString(value)); b.Freeze(); return b; }
     internal static void Theme(Application app)
     {
         var button = new Style(typeof(Button));
-        button.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(20, 12, 20, 12)));
+        button.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(16, 8, 16, 8)));
         button.Setters.Add(new Setter(FrameworkElement.MarginProperty, new Thickness(4)));
         button.Setters.Add(new Setter(Control.FontSizeProperty, 15.0));
+        button.Setters.Add(new Setter(Control.FontWeightProperty, FontWeights.SemiBold));
+        button.Setters.Add(new Setter(FrameworkElement.MinHeightProperty, 38.0));
         button.Setters.Add(new Setter(Control.ForegroundProperty, Ink));
-        button.Setters.Add(new Setter(Control.BackgroundProperty, Brushes.White));
-        button.Setters.Add(new Setter(Control.BorderBrushProperty, new SolidColorBrush(Color.FromRgb(213, 223, 230))));
+        button.Setters.Add(new Setter(Control.BackgroundProperty, Surface));
+        button.Setters.Add(new Setter(Control.BorderBrushProperty, Line));
+        button.Setters.Add(new Setter(Control.BorderThicknessProperty, new Thickness(1)));
         button.Setters.Add(new Setter(Control.CursorProperty, Cursors.Hand));
+        button.Setters.Add(new Setter(Control.HorizontalContentAlignmentProperty, HorizontalAlignment.Center));
+        var buttonBorder = new FrameworkElementFactory(typeof(Border));
+        buttonBorder.SetValue(Border.CornerRadiusProperty, new CornerRadius(8));
+        buttonBorder.SetValue(Border.BackgroundProperty, new TemplateBindingExtension(Control.BackgroundProperty));
+        buttonBorder.SetValue(Border.BorderBrushProperty, new TemplateBindingExtension(Control.BorderBrushProperty));
+        buttonBorder.SetValue(Border.BorderThicknessProperty, new TemplateBindingExtension(Control.BorderThicknessProperty));
+        buttonBorder.SetValue(Border.PaddingProperty, new TemplateBindingExtension(Control.PaddingProperty));
+        var buttonContent = new FrameworkElementFactory(typeof(ContentPresenter));
+        buttonContent.SetValue(ContentPresenter.HorizontalAlignmentProperty, HorizontalAlignment.Center);
+        buttonContent.SetValue(ContentPresenter.VerticalAlignmentProperty, VerticalAlignment.Center);
+        buttonBorder.AppendChild(buttonContent);
+        button.Setters.Add(new Setter(Control.TemplateProperty, new ControlTemplate(typeof(Button)) { VisualTree = buttonBorder }));
+        var over = new Trigger { Property = UIElement.IsMouseOverProperty, Value = true };
+        over.Setters.Add(new Setter(Control.BorderBrushProperty, Brush("#5EEAD4"))); over.Setters.Add(new Setter(Control.BackgroundProperty, AccentSoft)); button.Triggers.Add(over);
+        var disabled = new Trigger { Property = UIElement.IsEnabledProperty, Value = false }; disabled.Setters.Add(new Setter(UIElement.OpacityProperty, .48)); button.Triggers.Add(disabled);
         app.Resources.Add(typeof(Button), button);
         var textBox = new Style(typeof(TextBox));
-        textBox.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(9)));
+        textBox.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(12, 9, 12, 9)));
         textBox.Setters.Add(new Setter(Control.FontSizeProperty, 15.0));
+        textBox.Setters.Add(new Setter(Control.MinHeightProperty, 40.0));
+        textBox.Setters.Add(new Setter(Control.BackgroundProperty, Surface));
+        textBox.Setters.Add(new Setter(Control.BorderBrushProperty, Line));
+        textBox.Setters.Add(new Setter(Control.BorderThicknessProperty, new Thickness(1)));
         app.Resources.Add(typeof(TextBox), textBox);
+        var password = new Style(typeof(PasswordBox));
+        password.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(12, 9, 12, 9))); password.Setters.Add(new Setter(Control.MinHeightProperty, 40.0)); password.Setters.Add(new Setter(Control.BackgroundProperty, Surface)); password.Setters.Add(new Setter(Control.BorderBrushProperty, Line)); app.Resources.Add(typeof(PasswordBox), password);
+        var combo = new Style(typeof(ComboBox)); combo.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(10, 7, 10, 7))); combo.Setters.Add(new Setter(Control.MinHeightProperty, 40.0)); combo.Setters.Add(new Setter(Control.BackgroundProperty, Surface)); combo.Setters.Add(new Setter(Control.BorderBrushProperty, Line)); app.Resources.Add(typeof(ComboBox), combo);
+        app.Resources.Add(typeof(CheckBox), ToggleStyle());
+        app.Resources.Add(typeof(ScrollBar), ScrollBarStyle());
     }
     internal static TextBlock Text(string text, double size = 15, Brush? brush = null) => new() { Text = text, FontSize = size, Foreground = brush ?? Ink, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(4, 6, 4, 6), LineHeight = size * 1.5 };
     internal static Button Button(string title, Action action, bool primary = false)
     {
         var b = new Button { Content = title };
-        if (primary) { b.Background = Accent; b.Foreground = Brushes.White; }
+        if (primary) { b.Background = Accent; b.Foreground = Brushes.White; b.BorderBrush = Accent; }
         b.Click += (_, _) => action(); return b;
     }
-    internal static Border Card(UIElement child) => new() { Background = Brushes.White, BorderBrush = new SolidColorBrush(Color.FromRgb(223, 230, 236)), BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(12), Padding = new Thickness(22), Margin = new Thickness(4, 8, 4, 8), Child = child };
+    internal static Border Card(UIElement child) => new() { Background = Surface, BorderBrush = Line, BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(12), Padding = new Thickness(20), Margin = new Thickness(4, 8, 4, 8), Child = child };
+    internal static Border SettingRow(string title, string description, UIElement action)
+    {
+        var grid = new Grid { MinHeight = 64 }; grid.ColumnDefinitions.Add(new ColumnDefinition()); grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        var copy = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 18, 0) }; copy.Children.Add(Text(title, 16)); copy.Children.Add(Text(description, 13, Muted)); grid.Children.Add(copy);
+        if (action is FrameworkElement element) { element.VerticalAlignment = VerticalAlignment.Center; element.HorizontalAlignment = HorizontalAlignment.Left; } Grid.SetColumn(action, 1); grid.Children.Add(action); return Card(grid);
+    }
+    internal static ScrollViewer Scroll(UIElement content) => new() { Content = content, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled, Padding = new Thickness(0, 0, 0, 8) };
+    internal static CheckBox Toggle(bool value, Action<bool> changed)
+    {
+        var toggle = new CheckBox { IsChecked = value, VerticalAlignment = VerticalAlignment.Center };
+        toggle.Checked += (_, _) => changed(true); toggle.Unchecked += (_, _) => changed(false); return toggle;
+    }
+    internal static CheckBox ChoicePill(string text, bool value)
+    {
+        var check = new CheckBox { Content = text, IsChecked = value, Width = 48, Height = 38, Margin = new Thickness(4), Cursor = Cursors.Hand, Foreground = Ink, FontWeight = FontWeights.SemiBold, HorizontalContentAlignment = HorizontalAlignment.Center };
+        var border = new FrameworkElementFactory(typeof(Border)); border.Name = "Pill"; border.SetValue(Border.CornerRadiusProperty, new CornerRadius(8)); border.SetValue(Border.BackgroundProperty, Surface); border.SetValue(Border.BorderBrushProperty, Line); border.SetValue(Border.BorderThicknessProperty, new Thickness(1)); border.SetValue(Border.PaddingProperty, new Thickness(10, 7, 10, 7));
+        var presenter = new FrameworkElementFactory(typeof(ContentPresenter)); presenter.SetValue(ContentPresenter.HorizontalAlignmentProperty, HorizontalAlignment.Center); presenter.SetValue(ContentPresenter.VerticalAlignmentProperty, VerticalAlignment.Center); border.AppendChild(presenter);
+        var template = new ControlTemplate(typeof(CheckBox)) { VisualTree = border }; var selected = new Trigger { Property = ToggleButton.IsCheckedProperty, Value = true }; selected.Setters.Add(new Setter(Border.BackgroundProperty, AccentSoft, "Pill")); selected.Setters.Add(new Setter(Border.BorderBrushProperty, Accent, "Pill")); template.Triggers.Add(selected); check.Template = template; return check;
+    }
     internal static Window Dialog(Window owner, string title, double width = 500, double height = 400)
     {
-        return new Window { Owner = owner, Title = title, Width = width, Height = height, MinWidth = 380, MinHeight = 240, WindowStartupLocation = WindowStartupLocation.CenterOwner, FlowDirection = FlowDirection.RightToLeft, FontFamily = new FontFamily("Segoe UI"), Background = Background, Foreground = Ink, Topmost = owner.Topmost, ShowInTaskbar = false };
+        return new Window { Owner = owner, Title = title, Width = width, Height = height, MinWidth = 380, MinHeight = 240, WindowStartupLocation = WindowStartupLocation.CenterOwner, FlowDirection = FlowDirection.RightToLeft, FontFamily = new FontFamily("Segoe UI Variable Text, Segoe UI"), Background = Background, Foreground = Ink, Topmost = owner.Topmost, ShowInTaskbar = false };
+    }
+
+    private static Style ToggleStyle()
+    {
+        var style = new Style(typeof(CheckBox)); style.Setters.Add(new Setter(Control.CursorProperty, Cursors.Hand)); style.Setters.Add(new Setter(FrameworkElement.WidthProperty, 46.0)); style.Setters.Add(new Setter(FrameworkElement.HeightProperty, 26.0)); style.Setters.Add(new Setter(FrameworkElement.MarginProperty, new Thickness(4)));
+        var outer = new FrameworkElementFactory(typeof(Grid));
+        var track = new FrameworkElementFactory(typeof(Border)); track.Name = "Track"; track.SetValue(Border.WidthProperty, 46.0); track.SetValue(Border.HeightProperty, 26.0); track.SetValue(Border.CornerRadiusProperty, new CornerRadius(13)); track.SetValue(Border.BackgroundProperty, Brush("#CBD5E1")); track.SetValue(Border.BorderBrushProperty, Brush("#94A3B8")); track.SetValue(Border.BorderThicknessProperty, new Thickness(1)); outer.AppendChild(track);
+        var dot = new FrameworkElementFactory(typeof(Border)); dot.Name = "Dot"; dot.SetValue(Border.WidthProperty, 20.0); dot.SetValue(Border.HeightProperty, 20.0); dot.SetValue(Border.CornerRadiusProperty, new CornerRadius(10)); dot.SetValue(Border.BackgroundProperty, Brushes.White); dot.SetValue(FrameworkElement.MarginProperty, new Thickness(3, 3, 23, 3)); dot.SetValue(FrameworkElement.HorizontalAlignmentProperty, HorizontalAlignment.Left); dot.SetValue(FrameworkElement.EffectProperty, new DropShadowEffect { BlurRadius = 4, ShadowDepth = 1, Opacity = .22 }); outer.AppendChild(dot);
+        var template = new ControlTemplate(typeof(CheckBox)) { VisualTree = outer };
+        var on = new Trigger { Property = ToggleButton.IsCheckedProperty, Value = true }; on.Setters.Add(new Setter(Border.BackgroundProperty, Accent, "Track")); on.Setters.Add(new Setter(Border.BorderBrushProperty, Accent, "Track")); on.Setters.Add(new Setter(FrameworkElement.MarginProperty, new Thickness(23, 3, 3, 3), "Dot")); template.Triggers.Add(on);
+        var off = new Trigger { Property = UIElement.IsEnabledProperty, Value = false }; off.Setters.Add(new Setter(UIElement.OpacityProperty, .45)); template.Triggers.Add(off); style.Setters.Add(new Setter(Control.TemplateProperty, template)); return style;
+    }
+    private static Style ScrollBarStyle()
+    {
+        const string xaml = "<ControlTemplate xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' TargetType='{x:Type ScrollBar}' xmlns:x='http://schemas.microsoft.com/winfx/2006/xaml'><Grid Width='6' Background='Transparent'><Track x:Name='PART_Track' IsDirectionReversed='True'><Track.DecreaseRepeatButton><RepeatButton Command='ScrollBar.PageUpCommand' Opacity='0' Focusable='False'/></Track.DecreaseRepeatButton><Track.Thumb><Thumb MinHeight='24'><Thumb.Template><ControlTemplate TargetType='{x:Type Thumb}'><Border Background='#94A3B8' CornerRadius='3'/></ControlTemplate></Thumb.Template></Thumb></Track.Thumb><Track.IncreaseRepeatButton><RepeatButton Command='ScrollBar.PageDownCommand' Opacity='0' Focusable='False'/></Track.IncreaseRepeatButton></Track></Grid></ControlTemplate>";
+        var style = new Style(typeof(ScrollBar)); style.Setters.Add(new Setter(FrameworkElement.WidthProperty, 6.0)); style.Setters.Add(new Setter(Control.TemplateProperty, (ControlTemplate)XamlReader.Parse(xaml))); return style;
     }
     internal static void Message(Window owner, string title, string text)
     {
@@ -121,7 +192,7 @@ internal static class SettingsEditor
     internal static void Show(MainWindow owner, Settings original, Store store)
     {
         var copy = System.Text.Json.JsonSerializer.Deserialize<Settings>(System.Text.Json.JsonSerializer.Serialize(original))!;
-        var w = Ui.Dialog(owner, "הגדרות הקיוסק", 800, 680);
+        var w = Ui.Dialog(owner, "הגדרות הקיוסק", Math.Min(1040, SystemParameters.WorkArea.Width - 40), Math.Min(780, SystemParameters.WorkArea.Height - 40));
         var outer = new DockPanel { Margin = new Thickness(24) };
         var bottom = new StackPanel { Orientation = Orientation.Horizontal };
         bottom.Children.Add(Ui.Button("שמירת הגדרות", () =>
@@ -163,31 +234,34 @@ internal static class SettingsEditor
         Refresh(); p.Children.Add(list);
         var actions = new WrapPanel(); actions.Children.Add(Ui.Button("הוספת תוכנה", () => Edit(w, null, copy, Refresh)));
         actions.Children.Add(Ui.Button("זיהוי תוכנות מותקנות", () => { foreach (var app in Discovery.Find()) if (!copy.Apps.Any(a => Policy.SamePath(a.Path, app.Path))) copy.Apps.Add(app); Refresh(); })); p.Children.Add(actions);
-        var usb = new CheckBox { Content = "הצגת כונני USB בקיוסק", IsChecked = copy.UsbEnabled, Margin = new Thickness(8), FontSize = 15 };
-        usb.Checked += (_, _) => copy.UsbEnabled = true; usb.Unchecked += (_, _) => copy.UsbEnabled = false; p.Children.Add(usb);
-        var gate = new CheckBox { Content = "דרישת סיסמה לקיצורי פעולות ולחלונות דו־שיח מזוהים", IsChecked = copy.GateDialogs, Margin = new Thickness(8), FontSize = 15 };
-        gate.Checked += (_, _) => copy.GateDialogs = true; gate.Unchecked += (_, _) => copy.GateDialogs = false; p.Children.Add(gate);
-        p.Children.Add(Ui.Text("הכיסוי אינו מלא: תפריטים פנימיים, שמירה אוטומטית, מסמכים אחרונים וקישורים בתוך תוכנה עשויים לפעול ללא אישור. אין בידוד של קבצים אישיים בחשבון הקיים.", 13, Ui.Muted));
+        p.Children.Add(Ui.SettingRow("כונני USB", "הצגת כוננים נשלפים ודפדפן קבצים פשוט במסך הקיוסק.", Ui.Toggle(copy.UsbEnabled, value => copy.UsbEnabled = value)));
+        p.Children.Add(Ui.SettingRow("אישור פעולות רגישות", "דרישת סיסמה לקיצורי פעולות ולחלונות דו־שיח מזוהים.", Ui.Toggle(copy.GateDialogs, value => copy.GateDialogs = value)));
+        p.Children.Add(Ui.Card(Ui.Text("הכיסוי אינו מלא: תפריטים פנימיים, שמירה אוטומטית, מסמכים אחרונים וקישורים בתוך תוכנה עשויים לפעול ללא אישור. אין בידוד של קבצים אישיים בחשבון הקיים.", 13, Ui.Muted)));
         TextBox? hintEditor = null;
         p.Children.Add(Ui.Button("שינוי סיסמה", () =>
         {
             if (PasswordPrompt.Ask(w, original, "אישור שינוי סיסמה") && PasswordPrompt.Set(w, original, store)) { copy.Salt = original.Salt; copy.PasswordHash = original.PasswordHash; copy.PasswordHint = original.PasswordHint; if (hintEditor != null) hintEditor.Text = copy.PasswordHint; }
         }));
-        var tabs = new TabControl();
-        tabs.Items.Add(new TabItem { Header = "תוכנות ואפשרויות", Padding = new Thickness(16, 10, 16, 10), Content = new ScrollViewer { Content = p, VerticalScrollBarVisibility = ScrollBarVisibility.Auto } });
-        tabs.Items.Add(new TabItem { Header = "לוח זמנים", Padding = new Thickness(16, 10, 16, 10), Content = new ScrollViewer { Content = ScheduleEditor.Create(w, copy), VerticalScrollBarVisibility = ScrollBarVisibility.Auto } });
-        tabs.Items.Add(new TabItem { Header = "עיצוב המסך", Padding = new Thickness(16, 10, 16, 10), Content = new ScrollViewer { Content = AppearanceEditor.Create(w, copy), VerticalScrollBarVisibility = ScrollBarVisibility.Auto } });
         var extras = new StackPanel(); extras.Children.Add(Ui.Text("סיסמה ועדכונים", 25));
-        extras.Children.Add(Ui.Text("רמז לסיסמה · לא חובה")); var hint = new TextBox { Text = copy.PasswordHint, MaxLength = 200 }; hintEditor = hint; hint.TextChanged += (_, _) => copy.PasswordHint = hint.Text.Trim(); extras.Children.Add(hint);
-        extras.Children.Add(Ui.Text("הרמז נשמר כטקסט גלוי ומוצג בלחיצה במסך הסיסמה. אין להזין בו את הסיסמה עצמה.", 13, Ui.Muted));
-        var autoUpdate = new CheckBox { Content = "בדיקת עדכונים אוטומטית בפתיחה ואחת ליום בזמן שהתוכנה פועלת", IsChecked = copy.AutoCheckUpdates, FontSize = 15, Margin = new Thickness(8) };
-        autoUpdate.Checked += (_, _) => copy.AutoCheckUpdates = true; autoUpdate.Unchecked += (_, _) => copy.AutoCheckUpdates = false; extras.Children.Add(autoUpdate);
-        var prereleases = new CheckBox { Content = "הצגת עדכוני גרסאות ניסיון", IsChecked = copy.IncludePrereleaseUpdates, FontSize = 15, Margin = new Thickness(8) };
-        prereleases.Checked += (_, _) => copy.IncludePrereleaseUpdates = true; prereleases.Unchecked += (_, _) => copy.IncludePrereleaseUpdates = false; extras.Children.Add(prereleases);
-        extras.Children.Add(Ui.Text("הבדיקה פונה ל־GitHub כדי לקרוא פרטי מהדורות. לא נשלחים הגדרות, סיסמה או רמז, ולא מתבצעת התקנה אוטומטית. אפשר לבדוק ידנית בכפתור „עדכונים” במסך הבית.", 14, Ui.Muted));
+        var hint = new TextBox { Text = copy.PasswordHint, MaxLength = 200, Width = 270 }; hintEditor = hint; hint.TextChanged += (_, _) => copy.PasswordHint = hint.Text.Trim();
+        extras.Children.Add(Ui.SettingRow("רמז לסיסמה", "אופציונלי, נשמר כטקסט גלוי. אין להזין בו את הסיסמה עצמה.", hint));
+        extras.Children.Add(Ui.SettingRow("בדיקת עדכונים אוטומטית", "בדיקה בפתיחה ואחת ליום בזמן שהתוכנה פועלת.", Ui.Toggle(copy.AutoCheckUpdates, value => copy.AutoCheckUpdates = value)));
+        extras.Children.Add(Ui.SettingRow("גרסאות ניסיון", "הצגת עדכונים מערוץ גרסאות הניסיון בנוסף לגרסאות יציבות.", Ui.Toggle(copy.IncludePrereleaseUpdates, value => copy.IncludePrereleaseUpdates = value)));
+        extras.Children.Add(Ui.Card(Ui.Text("הבדיקה פונה ל־GitHub כדי לקרוא פרטי מהדורות. לא נשלחים הגדרות, סיסמה או רמז, ולא מתבצעת התקנה אוטומטית. אפשר לבדוק ידנית בכפתור „עדכונים” במסך הבית.", 14, Ui.Muted)));
         extras.Children.Add(Ui.BrandFooter(w, true, copy.Appearance.AnimationsEnabled));
-        tabs.Items.Add(new TabItem { Header = "סיסמה, עדכונים ואודות", Padding = new Thickness(16, 10, 16, 10), Content = new ScrollViewer { Content = extras, VerticalScrollBarVisibility = ScrollBarVisibility.Auto } });
-        outer.Children.Add(tabs); w.Content = outer; w.ShowDialog();
+        var pages = new UIElement[] { Ui.Scroll(p), Ui.Scroll(ScheduleEditor.Create(w, copy)), Ui.Scroll(AppearanceEditor.Create(w, copy)), Ui.Scroll(extras) };
+        var shell = new Grid { Margin = new Thickness(0, 0, 0, 12) }; shell.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(190) }); shell.ColumnDefinitions.Add(new ColumnDefinition());
+        var navCard = new Border { Background = Ui.AccentSoft, BorderBrush = Ui.Line, BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(12), Padding = new Thickness(8), Margin = new Thickness(0, 0, 16, 0) };
+        var nav = new StackPanel(); nav.Children.Add(Ui.Text("הגדרות", 26)); nav.Children.Add(Ui.Text("כל האפשרויות במקום אחד", 12, Ui.Muted)); navCard.Child = nav; shell.Children.Add(navCard);
+        var host = new ContentControl(); Grid.SetColumn(host, 1); shell.Children.Add(host);
+        var labels = new[] { "תוכנות ואפשרויות", "לוח זמנים", "עיצוב המסך", "סיסמה ועדכונים" }; var navButtons = new List<Button>();
+        void SelectPage(int index)
+        {
+            host.Content = pages[index];
+            for (int i = 0; i < navButtons.Count; i++) { navButtons[i].Background = i == index ? Ui.Surface : Brushes.Transparent; navButtons[i].BorderBrush = i == index ? Ui.Line : Brushes.Transparent; navButtons[i].Foreground = i == index ? Ui.Accent : Ui.Ink; }
+        }
+        for (int i = 0; i < labels.Length; i++) { int index = i; var button = Ui.Button(labels[i], () => SelectPage(index)); button.HorizontalContentAlignment = HorizontalAlignment.Right; button.HorizontalAlignment = HorizontalAlignment.Stretch; navButtons.Add(button); nav.Children.Add(button); }
+        SelectPage(0); outer.Children.Add(shell); w.Content = outer; w.ShowDialog();
     }
     private static void Edit(Window owner, AllowedApp? existing, Settings settings, Action refresh)
     {

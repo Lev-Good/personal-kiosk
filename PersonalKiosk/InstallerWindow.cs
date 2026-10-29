@@ -17,7 +17,7 @@ internal sealed class InstallerWindow : Window
     internal InstallerWindow(bool uninstall = false)
     {
         Title = uninstall ? "הסרת קיוסק אישי" : "התקנת קיוסק אישי"; Width = 620; Height = 560; ResizeMode = ResizeMode.NoResize;
-        WindowStartupLocation = WindowStartupLocation.CenterScreen; FlowDirection = FlowDirection.RightToLeft; Background = Ui.Background; FontFamily = new FontFamily("Segoe UI");
+        WindowStartupLocation = WindowStartupLocation.CenterScreen; FlowDirection = FlowDirection.RightToLeft; Background = Ui.Background; FontFamily = new FontFamily("Segoe UI Variable Text, Segoe UI");
         var p = new StackPanel { Margin = new Thickness(34) };
         p.Children.Add(Ui.Text("קיוסק אישי", 36, Ui.Accent)); p.Children.Add(Ui.Text(uninstall ? "הסרת התוכנה מהמחשב" : "סביבת עבודה פשוטה למחשב שלך", 21));
         p.Children.Add(Ui.Text(uninstall ? "ההסרה תמחק את התוכנה וקיצורי הדרך. ההגדרות יישארו במחשב. יש לצאת מהקיוסק בסיסמה לפני הסרה." : "התקנה לחשבון הנוכחי, ללא צורך בהרשאת מנהל. התוכנה כוללת את רכיבי ההפעלה שלה; אין צורך להתקין ‎.NET בנפרד.", 15, Ui.Muted));

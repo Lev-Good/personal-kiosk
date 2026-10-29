@@ -7,8 +7,8 @@
     <ImplicitUsings>disable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <AssemblyName>PersonalKiosk</AssemblyName>
-    <Version>1.3.0</Version>
-    <InformationalVersion>1.3.0-rc.1</InformationalVersion>
+    <Version>1.4.0</Version>
+    <InformationalVersion>1.4.0-rc.1</InformationalVersion>
     <Company>לב טוב דיגיטל</Company>
     <Copyright>© 2026 לב טוב דיגיטל. כל הזכויות שמורות.</Copyright>
     <ApplicationManifest>app.manifest</ApplicationManifest>

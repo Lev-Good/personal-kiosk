@@ -56,7 +56,7 @@ internal static class Program
             if (args.Contains("--uninstall")) { app.Run(new InstallerWindow(true)); return 0; }
             if (args.Contains("--preview-schedule") || Path.GetFileNameWithoutExtension(Environment.ProcessPath!).Equals("PersonalKioskSchedulePreview", StringComparison.OrdinalIgnoreCase))
             {
-                var previewWindow = new Window { Title = "לוח זמנים — תצוגה מקדימה", Width = 780, Height = 760, WindowStartupLocation = WindowStartupLocation.CenterScreen, FlowDirection = FlowDirection.RightToLeft, Background = Ui.Background, FontFamily = new System.Windows.Media.FontFamily("Segoe UI") };
+                var previewWindow = new Window { Title = "לוח זמנים — תצוגה מקדימה", Width = 780, Height = 760, WindowStartupLocation = WindowStartupLocation.CenterScreen, FlowDirection = FlowDirection.RightToLeft, Background = Ui.Background, FontFamily = new System.Windows.Media.FontFamily("Segoe UI Variable Text, Segoe UI") };
                 var panel = new System.Windows.Controls.StackPanel { Margin = new Thickness(24) };
                 panel.Children.Add(Ui.Text("תצוגה מקדימה בלבד — השינויים אינם נשמרים", 14, Ui.Accent));
                 panel.Children.Add(ScheduleEditor.Create(previewWindow, new Settings { Schedules = new() { new WeeklySchedule { Name = "סדר א׳", Start = "09:00", End = "13:00" }, new WeeklySchedule { Name = "סדר ב׳", Start = "15:30", End = "19:00" }, new WeeklySchedule { Name = "סדר ג׳", Start = "20:30", End = "22:30" } } }));

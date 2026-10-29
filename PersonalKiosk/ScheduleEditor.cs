@@ -12,17 +12,14 @@ internal static class ScheduleEditor
     {
         var panel = new StackPanel();
         panel.Children.Add(Ui.Text(availability ? "זמינות התוכנה לפי שעות" : "הפעלה לפי שעות הסדרים", 24));
-        var enabled = new CheckBox { Content = availability ? "הגבלת התוכנה לימים ולשעות שלהלן" : "הפעלת קיוסק אוטומטית לפי לוח זמנים שבועי", IsChecked = settings.ScheduleEnabled, FontSize = 15, Margin = new Thickness(8) };
-        enabled.Checked += (_, _) => settings.ScheduleEnabled = true; enabled.Unchecked += (_, _) => settings.ScheduleEnabled = false; panel.Children.Add(enabled);
+        panel.Children.Add(Ui.SettingRow(availability ? "הגבלת זמינות התוכנה" : "הפעלה אוטומטית", availability ? "התוכנה תהיה זמינה רק בימים ובשעות שלהלן." : "הפעלת הקיוסק אוטומטית לפי לוח זמנים שבועי.", Ui.Toggle(settings.ScheduleEnabled, value => settings.ScheduleEnabled = value)));
         panel.Children.Add(Ui.Text(availability ? "במצב קיוסק התוכנה זמינה רק בתוך טווח פעיל. מחוץ לשעות אלה החלונות שלה ימוזערו בלי לסגור מסמכים. כשההגבלה כבויה, התוכנה זמינה תמיד." : "לכל סדר בוחרים ימים וטווח שעות. הקיוסק מופעל בתחילת הטווח, או כשחוזרים למחשב בתוך הטווח. כברירת מחדל החסימה מסתיימת בסוף רצף הסדרים. אפשר לשנות זאת בלשונית עיצוב המסך.", 14, Ui.Muted));
         if (!availability)
         {
             panel.Children.Add(Ui.Text("התזמון פועל לפי שעון המחשב כשהחשבון מחובר. התוכנה נשארת ברקע ועולה בכניסה ל־Windows כל עוד התזמון מופעל. היא אינה מדליקה מחשב כבוי או מעירה אותו משינה.", 13, Ui.Muted));
-            var warnings = new CheckBox { Content = "התראה מוקדמת והתראה נוספת בדקה האחרונה", IsChecked = settings.ScheduleWarningsEnabled, Margin = new Thickness(8), FontSize = 15 };
-            warnings.Checked += (_, _) => settings.ScheduleWarningsEnabled = true; warnings.Unchecked += (_, _) => settings.ScheduleWarningsEnabled = false; panel.Children.Add(warnings);
-            var leadRow = new WrapPanel(); leadRow.Children.Add(Ui.Text("התראה מוקדמת, דקות:", 15));
-            var lead = new ComboBox { ItemsSource = Enumerable.Range(1, 60).ToList(), SelectedItem = settings.ScheduleWarningMinutes, FontSize = 16, Margin = new Thickness(8), Width = 100 };
-            lead.SelectionChanged += (_, _) => { if (lead.SelectedItem is int minutes) settings.ScheduleWarningMinutes = minutes; }; leadRow.Children.Add(lead); panel.Children.Add(leadRow);
+            panel.Children.Add(Ui.SettingRow("התראות לפני סדר", "התראה מוקדמת והתראה נוספת בדקה האחרונה.", Ui.Toggle(settings.ScheduleWarningsEnabled, value => settings.ScheduleWarningsEnabled = value)));
+            var lead = new ComboBox { ItemsSource = Enumerable.Range(1, 60).ToList(), SelectedItem = settings.ScheduleWarningMinutes, FontSize = 16, Width = 100 };
+            lead.SelectionChanged += (_, _) => { if (lead.SelectedItem is int minutes) settings.ScheduleWarningMinutes = minutes; }; panel.Children.Add(Ui.SettingRow("זמן ההתראה", "מספר הדקות לפני תחילת הסדר.", lead));
         }
         var list = new StackPanel(); panel.Children.Add(list);
         void Refresh()
@@ -58,8 +55,8 @@ internal static class ScheduleEditor
         var w = Ui.Dialog(owner, availability ? "טווח זמינות" : "הגדרת סדר", 600, 560); var panel = new StackPanel { Margin = new Thickness(24) };
         var source = existing ?? new WeeklySchedule();
         panel.Children.Add(Ui.Text(availability ? "שם הטווח" : "שם הסדר")); var name = new TextBox { Text = source.Name }; panel.Children.Add(name);
-        var enabled = new CheckBox { Content = "סדר פעיל", IsChecked = source.Enabled, Margin = new Thickness(8) }; panel.Children.Add(enabled);
-        panel.Children.Add(Ui.Text("ימי התחלת הסדר")); var days = new WrapPanel(); var checks = Enumerable.Range(0, 7).Select(day => new CheckBox { Content = DayName(day), IsChecked = source.Days.Contains(day), Margin = new Thickness(8), FontSize = 16 }).ToArray(); foreach (var check in checks) days.Children.Add(check); panel.Children.Add(days);
+        var enabled = Ui.Toggle(source.Enabled, _ => { }); panel.Children.Add(Ui.SettingRow("סדר פעיל", "אפשר להשבית את הטווח בלי למחוק אותו.", enabled));
+        panel.Children.Add(Ui.Text("ימי התחלת הסדר")); var days = new WrapPanel(); var checks = Enumerable.Range(0, 7).Select(day => Ui.ChoicePill(DayName(day), source.Days.Contains(day))).ToArray(); foreach (var check in checks) days.Children.Add(check); panel.Children.Add(days);
         panel.Children.Add(Ui.Text("שעת התחלה · 24 שעות")); var start = new TextBox { Text = source.Start, FlowDirection = FlowDirection.LeftToRight }; panel.Children.Add(start);
         panel.Children.Add(Ui.Text(availability ? "שעת סיום הזמינות" : "שעת סיום הסדר")); var end = new TextBox { Text = source.End, FlowDirection = FlowDirection.LeftToRight }; panel.Children.Add(end);
         panel.Children.Add(Ui.Text("לדוגמה 09:00 עד 13:00. שעת סיום מוקדמת מההתחלה מגדירה סדר שחוצה חצות.", 13, Ui.Muted));

@@ -48,7 +48,7 @@ internal sealed class MainWindow : Window
         this.store = store; this.settings = settings; this.preview = preview; this.backgroundStart = backgroundStart;
         Title = "קיוסק אישי"; Width = Math.Min(1120, SystemParameters.WorkArea.Width - 24); Height = Math.Min(840, SystemParameters.WorkArea.Height - 24); MinWidth = 760; MinHeight = 560;
         WindowStartupLocation = WindowStartupLocation.CenterScreen; FlowDirection = FlowDirection.RightToLeft;
-        FontFamily = new FontFamily("Segoe UI"); Background = Ui.Background; Foreground = Ui.Ink;
+        FontFamily = new FontFamily("Segoe UI Variable Text, Segoe UI"); Background = Ui.Background; Foreground = Ui.Ink;
         Build(); Closing += OnClosing;
         SourceInitialized += (_, _) => { var source = HwndSource.FromHwnd(new WindowInteropHelper(this).Handle); source?.AddHook(WindowMessage); };
         Loaded += (_, _) =>

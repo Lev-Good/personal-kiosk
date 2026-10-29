@@ -1,4 +1,4 @@
-# Release verification — PersonalKiosk 1.3.0
+# Release verification — PersonalKiosk 1.4.0
 
 Status: packaged release candidate; NOT certified for unrestricted distribution.
 
@@ -7,7 +7,7 @@ Status: packaged release candidate; NOT certified for unrestricted distribution.
 - Self-contained Windows x64 release build.
 - 146 automated checks pass. New checks cover session start/end and persisted deadlines, exact end boundary, restart/wake expiry detection, no early unlocking, overlap/touching/week-boundary merging, full-week continuous coverage, late automatic end preserving the next occurrence, manual entry without a deadline, password-only mode, countdown formatting, wallpaper import/fallback/persistence and the exact original logo hash with all 76 frames. Existing password, file, scheduling, update and hint checks remain passing. Bar-Ilan discovery uses inert fixtures, not an installed copy.
 - The updater was checked against the real public GitHub API in the previous release. This release continues using the same bounded, read-only transport; no settings are sent by a probe.
-- New light/dark/warm kiosk layouts, centered live-clock/countdown values, logo placements and appearance settings were rendered off-screen in WPF and visually inspected. This does not replace real-time animation and desktop interaction checks.
+- The Fluent-style light/dark/warm kiosk layouts, primary action, 44×44 program icons, thin scrollbars, toggle rows, centered live-clock/countdown values, logo placements, schedule and appearance settings were rendered off-screen in WPF and visually inspected. This does not replace real-time animation and desktop interaction checks.
 - Runtime package vulnerability advisory lookup was unavailable because the NuGet service could not be reached. Compilation and local checks passed; no successful online vulnerability audit is claimed.
 - No live kiosk activation, registry startup changes or installation performed on the owner's desktop during development.
 
@@ -25,6 +25,7 @@ Status: packaged release candidate; NOT certified for unrestricted distribution.
 - [ ] Terminate kiosk UI in a test environment, verify watchdog relaunch, then normal password exit.
 - [ ] Configure sample schedules, close to tray, relaunch shortcut and verify the existing window is restored; authenticate tray quit and verify scheduling resumes next login.
 - [ ] Inspect the new schedule tab and editor visually on target displays.
+- [ ] Inspect all four settings navigation sections at 100%, 125%, 150% and 200% display scaling; verify keyboard focus, toggle switches, thin scrolling and long Hebrew labels.
 - [ ] Verify real timed activation, password exit mid-window, overlapping/overnight entries, sleep/wake, login catch-up and disabled schedules on Windows 10/11.
 - [ ] Check spring-forward/fall-back transitions in the target Windows time zone; verify no duplicate activation of a handled date.
 - [ ] Verify Bar-Ilan discovery and launch with real installations, including different versions and non-default install folders.

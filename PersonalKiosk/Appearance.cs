@@ -64,8 +64,8 @@ internal sealed class KioskPalette
     internal KioskPalette(KioskVisualSettings settings)
     {
         Dark = settings.Theme == "midnight";
-        Ink = Brush(Dark ? "#F0F5FF" : "#172D3B"); Muted = Brush(Dark ? "#A0B2CC" : "#657C87"); Accent = Brush(Dark ? "#7EE2CD" : "#087F78");
-        Surface = Brush(Dark ? "#EE18283E" : "#F5FFFFFF"); Line = Brush(Dark ? "#34475D" : "#DBE7EA");
+        Ink = Brush(Dark ? "#F0F5FF" : "#0F172A"); Muted = Brush(Dark ? "#A0B2CC" : "#64748B"); Accent = Brush(Dark ? "#7EE2CD" : "#0F766E");
+        Surface = Brush(Dark ? "#EE18283E" : "#FFFFFF"); Line = Brush(Dark ? "#34475D" : "#E2E8F0");
     }
     internal static SolidColorBrush Brush(string value) { var b = new SolidColorBrush((Color)ColorConverter.ConvertFromString(value)); b.Freeze(); return b; }
 }
@@ -75,8 +75,8 @@ internal static class DashboardUi
     internal static Grid Background(KioskVisualSettings settings)
     {
         var grid = new Grid { ClipToBounds = true };
-        string first = settings.Theme == "midnight" ? "#0B1426" : settings.Theme == "sand" ? "#FAF5E9" : "#ECF7F6";
-        string last = settings.Theme == "midnight" ? "#1A3147" : settings.Theme == "sand" ? "#EEEDE2" : "#E9EEF9";
+        string first = settings.Theme == "midnight" ? "#0B1426" : settings.Theme == "sand" ? "#FAF5E9" : "#F8FAFC";
+        string last = settings.Theme == "midnight" ? "#1A3147" : settings.Theme == "sand" ? "#EEEDE2" : "#F0FDFA";
         grid.Background = new LinearGradientBrush((Color)ColorConverter.ConvertFromString(first), (Color)ColorConverter.ConvertFromString(last), new Point(1, 0), new Point(0, 1));
         var wallpaper = settings.Theme == "photo" ? AppearancePolicy.LoadWallpaper(settings.BackgroundImagePath) : null;
         if (wallpaper != null)
@@ -106,6 +106,7 @@ internal static class DashboardUi
         void Hover(bool over)
         {
             button.BorderBrush = over ? palette.Accent : palette.Line;
+            button.Effect = over ? new DropShadowEffect { Color = Color.FromRgb(15, 118, 110), BlurRadius = 18, ShadowDepth = 3, Opacity = .18 } : null;
             if (animate) ((TranslateTransform)button.RenderTransform).BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation(over ? -3 : 0, TimeSpan.FromMilliseconds(170)) { EasingFunction = new QuadraticEase() });
         }
         button.MouseEnter += (_, _) => { if (button.IsEnabled) Hover(true); }; button.MouseLeave += (_, _) => Hover(false);

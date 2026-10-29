@@ -28,12 +28,13 @@ internal sealed class KioskDashboard
         var root = new DockPanel { Margin = new Thickness(32, 24, 32, 20) }; View.Children.Add(root);
         var header = new DockPanel { Margin = new Thickness(0, 0, 0, 18) }; DockPanel.SetDock(header, Dock.Top); root.Children.Add(header);
         var actions = new WrapPanel { VerticalAlignment = VerticalAlignment.Center }; DockPanel.SetDock(actions, Dock.Left); header.Children.Add(actions);
-        void Command(string title, Action action)
+        void Command(string title, Action action, bool primary = false)
         {
             var b = DashboardUi.Tile(DashboardUi.Text(title, 14, palette.Ink), action, palette, animate, 0); b.Width = double.NaN; b.Height = 43; b.Padding = new Thickness(14, 9, 14, 9); actions.Children.Add(b);
+            if (primary) { b.Background = Ui.Accent; b.BorderBrush = Ui.Accent; ((TextBlock)b.Content).Foreground = Brushes.White; }
         }
         if (kiosk) Command("יציאה מהקיוסק", commands.Exit);
-        else { Command("הפעלת הקיוסק", commands.Start); Command("הגדרות", commands.Settings); Command("עדכונים", commands.Updates); }
+        else { Command("הפעלת הקיוסק", commands.Start, true); Command("הגדרות", commands.Settings); Command("עדכונים", commands.Updates); }
         Command("עזרה", commands.Help);
         var heading = new StackPanel(); var name = new WrapPanel { VerticalAlignment = VerticalAlignment.Center };
         name.Children.Add(new Border { CornerRadius = new CornerRadius(10), Padding = new Thickness(3), Background = Brushes.White, Child = new LogoImage(42, animate), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 10, 0) });
@@ -70,7 +71,8 @@ internal sealed class KioskDashboard
         foreach (var app in settings.Apps)
         {
             bool available = !kiosk || FeaturePolicy.Available(app, DateTime.Now); bool exists = File.Exists(app.Path);
-            var content = new StackPanel(); var icon = DashboardUi.Text(app.Name == "Word" ? "W" : app.Extensions.Contains(".pdf") ? "PDF" : app.Name == "פנקס רשימות" ? "Aa" : "▤", 25, palette.Accent); icon.FontWeight = FontWeights.SemiBold; content.Children.Add(icon);
+            var content = new StackPanel(); var icon = DashboardUi.Text(app.Name == "Word" ? "W" : app.Extensions.Contains(".pdf") ? "PDF" : app.Name == "פנקס רשימות" ? "Aa" : "▤", app.Extensions.Contains(".pdf") ? 14 : 20, palette.Accent); icon.FontWeight = FontWeights.SemiBold; icon.TextAlignment = TextAlignment.Center; icon.VerticalAlignment = VerticalAlignment.Center;
+            content.Children.Add(new Border { Width = 44, Height = 44, CornerRadius = new CornerRadius(10), Background = Ui.AccentPale, Child = icon, Margin = new Thickness(0, 0, 0, 8), HorizontalAlignment = HorizontalAlignment.Right });
             content.Children.Add(DashboardUi.Text(app.Name, 16, palette.Ink)); content.Children.Add(DashboardUi.Text(!exists ? "לא נמצאה במחשב" : !available ? "מחוץ לשעות הזמינות" : kiosk ? "פתיחה  ←" : "מוכנה לשימוש", 11, palette.Muted));
             var button = DashboardUi.Tile(content, () => commands.Launch(app), palette, animate, index++); button.Height = 140; button.IsEnabled = available && exists; System.Windows.Automation.AutomationProperties.SetName(button, app.Name); apps.Children.Add(button);
         }
