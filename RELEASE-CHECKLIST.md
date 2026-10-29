@@ -1,4 +1,4 @@
-# Release verification — PersonalKiosk 1.6.0
+# Release verification — PersonalKiosk 1.6.1
 
 Status: packaged release candidate; NOT certified for unrestricted distribution.
 

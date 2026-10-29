@@ -71,8 +71,8 @@ internal sealed class KioskDashboard
         foreach (var app in settings.Apps)
         {
             bool available = !kiosk || FeaturePolicy.Available(app, DateTime.Now); bool exists = File.Exists(app.Path);
-            var content = new StackPanel(); var icon = DashboardUi.Text(app.Name == "Word" ? "W" : app.Extensions.Contains(".pdf") ? "PDF" : app.Name == "פנקס רשימות" ? "Aa" : "▤", app.Extensions.Contains(".pdf") ? 14 : 20, palette.Accent); icon.FontWeight = FontWeights.SemiBold; icon.TextAlignment = TextAlignment.Center; icon.VerticalAlignment = VerticalAlignment.Center;
-            content.Children.Add(new Border { Width = 44, Height = 44, CornerRadius = new CornerRadius(10), Background = Ui.AccentPale, Child = icon, Margin = new Thickness(0, 0, 0, 8), HorizontalAlignment = HorizontalAlignment.Right });
+            var content = new StackPanel(); var icon = Ui.AppBadge(app); icon.Margin = new Thickness(0, 0, 0, 8); icon.HorizontalAlignment = HorizontalAlignment.Right;
+            content.Children.Add(icon);
             content.Children.Add(DashboardUi.Text(app.Name, 16, palette.Ink)); content.Children.Add(DashboardUi.Text(!exists ? "לא נמצאה במחשב" : !available ? "מחוץ לשעות הזמינות" : kiosk ? "פתיחה  ←" : "מוכנה לשימוש", 11, palette.Muted));
             var button = DashboardUi.Tile(content, () => commands.Launch(app), palette, animate, index++); button.Height = 140; button.IsEnabled = available && exists; System.Windows.Automation.AutomationProperties.SetName(button, app.Name); apps.Children.Add(button);
         }

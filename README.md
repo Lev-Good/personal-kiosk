@@ -12,10 +12,10 @@ Requires Windows x64 and .NET SDK 10. Run `pwsh -File ./build.ps1` from this dir
 
 Outputs in `dist/`:
 
-- `PersonalKiosk-1.6.0-win-x64/PersonalKioskSetup.exe`: per-user installer. Installer mode is selected by this exact filename or `--install`.
+- `PersonalKiosk-1.6.1-win-x64/PersonalKioskSetup.exe`: per-user installer. Installer mode is selected by this exact filename or `--install`.
 - `app/PersonalKiosk.exe`: portable application.
-- `PersonalKiosk-1.6.0-win-x64.zip`: distribution candidate, guide, licenses, test results and checksums.
-- `PersonalKiosk-1.6.0-source.zip`: source-only archive, without settings or build output.
+- `PersonalKiosk-1.6.1-win-x64.zip`: distribution candidate, guide, licenses, test results and checksums.
+- `PersonalKiosk-1.6.1-source.zip`: source-only archive, without settings or build output.
 
 The portable executable must stay at the same path while the kiosk is active; the startup registration and watchdog refer to that path. Installation places it under `%LOCALAPPDATA%\Programs\PersonalKiosk`.
 
@@ -81,6 +81,11 @@ The legacy settings tabs were replaced by a clean right-side navigation rail. Ea
 ## Version 1.6 landscape collection
 
 The built-in landscape selector now contains ten offline backgrounds, all visually inspected to contain no people: tropical lake, desert, mountain lake, forest waterfall, snowy mountains, northern lights, ocean sunset, tea fields, alpine lakes and Moraine Lake. The earlier Peyto Lake panorama containing visitors was removed from the project and executable rather than merely hidden. Every file is CC0 or public domain; exact authors, source pages and license terms are bundled in `LandscapeLicenses.txt`.
+
+### Version 1.6.1 interface corrections
+
+- The password-change action is located in the **Password and updates** settings page.
+- Program cards on the home and kiosk dashboards use the executable's real icon, with the same safe fallback used by the settings list.
 
 ## Boundaries and release status
 

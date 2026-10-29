@@ -265,11 +265,11 @@ internal static class SettingsEditor
         p.Children.Add(Ui.SettingRow("אישור פעולות רגישות", "דרישת סיסמה לקיצורי פעולות ולחלונות דו־שיח מזוהים.", Ui.Toggle(copy.GateDialogs, value => copy.GateDialogs = value)));
         p.Children.Add(Ui.Card(Ui.Text("הכיסוי אינו מלא: תפריטים פנימיים, שמירה אוטומטית, מסמכים אחרונים וקישורים בתוך תוכנה עשויים לפעול ללא אישור. אין בידוד של קבצים אישיים בחשבון הקיים.", 13, Ui.Muted)));
         TextBox? hintEditor = null;
-        p.Children.Add(Ui.Button("שינוי סיסמה", () =>
+        var extras = new StackPanel(); extras.Children.Add(Ui.Text("סיסמה ועדכונים", 25));
+        extras.Children.Add(Ui.SettingRow("שינוי סיסמה", "החלפת הסיסמה המשמשת ליציאה מהקיוסק ולאישור פעולות רגישות.", Ui.Button("שינוי סיסמה", () =>
         {
             if (PasswordPrompt.Ask(w, original, "אישור שינוי סיסמה") && PasswordPrompt.Set(w, original, store)) { copy.Salt = original.Salt; copy.PasswordHash = original.PasswordHash; copy.PasswordHint = original.PasswordHint; if (hintEditor != null) hintEditor.Text = copy.PasswordHint; }
-        }));
-        var extras = new StackPanel(); extras.Children.Add(Ui.Text("סיסמה ועדכונים", 25));
+        })));
         var hint = new TextBox { Text = copy.PasswordHint, MaxLength = 200, Width = 270 }; hintEditor = hint; hint.TextChanged += (_, _) => copy.PasswordHint = hint.Text.Trim();
         extras.Children.Add(Ui.SettingRow("רמז לסיסמה", "אופציונלי, נשמר כטקסט גלוי. אין להזין בו את הסיסמה עצמה.", hint));
         extras.Children.Add(Ui.SettingRow("בדיקת עדכונים אוטומטית", "בדיקה בפתיחה ואחת ליום בזמן שהתוכנה פועלת.", Ui.Toggle(copy.AutoCheckUpdates, value => copy.AutoCheckUpdates = value)));
