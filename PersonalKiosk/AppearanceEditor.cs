@@ -42,6 +42,8 @@ internal static class AppearanceEditor
         panel.Children.Add(Ui.Card(Ui.Text("עשר תמונות הנוף המובנות אינן כוללות אנשים, נשמרות בתוך התוכנה וזמינות גם ללא אינטרנט. פרטי המקור והרישיון הציבורי מצורפים לקובץ LandscapeLicenses.txt.", 13, Ui.Muted)));
         panel.Children.Add(Ui.SettingRow("אנימציות עדינות", "תנועה רגועה ולוגו מונפש; מכבד את הגדרת צמצום התנועה של Windows.", Ui.Toggle(settings.Appearance.AnimationsEnabled, value => settings.Appearance.AnimationsEnabled = value)));
         panel.Children.Add(Ui.SettingRow("ספירה לאחור", "הצגת הזמן שנותר לסיום הסדר או לתחילת הסדר הבא.", Ui.Toggle(settings.Appearance.ShowCountdown, value => settings.Appearance.ShowCountdown = value)));
+        panel.Children.Add(Ui.SettingRow("סמל קיוסק צף", "סמל קטן ובהיר מעל החלונות בכל מסך בזמן שהקיוסק פעיל. ניתן לגרור אותו למיקום אחר.", Ui.Toggle(settings.ShowFloatingIndicator, value => settings.ShowFloatingIndicator = value)));
+        panel.Children.Add(Ui.Card(Ui.Text("הסמל הצף כבוי כברירת מחדל. המיקום שתבחרו נשמר באופן יחסי ומוחל באותו מקום בכל המסכים.", 13, Ui.Muted)));
         panel.Children.Add(Ui.Text("פתיחת המחשב בסוף הסדר", 22));
         panel.Children.Add(Ui.SettingRow("סיום חסימה אוטומטי", "בסוף רצף סדרים החסימה מוסרת והיישום ממתין ברקע לסדר הבא.", Ui.Toggle(settings.AutoUnlockAtScheduleEnd, value => settings.AutoUnlockAtScheduleEnd = value)));
         panel.Children.Add(Ui.Card(Ui.Text("מופעל כברירת מחדל. סדרים חופפים או צמודים נחשבים לרצף אחד. בכניסה ידנית מחוץ לסדר אין שעת פתיחה אוטומטית. אפשרות זו זמינה רק בהגדרות, כשהקיוסק כבוי.", 14, Ui.Muted)));

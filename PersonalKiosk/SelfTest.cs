@@ -59,6 +59,8 @@ internal static class SelfTest
             Check("outside root validation fails", () => { try { Policy.ValidateUsbPath(doc, Path.Combine(dir, "other")); return false; } catch (IOException) { return true; } });
             Check("discovery paths exist and unique", () => { var apps = Discovery.Find(); return apps.All(a => File.Exists(a.Path)) && apps.Select(a => a.Path.ToLowerInvariant()).Distinct().Count() == apps.Count; });
             Check("keyboard INPUT struct size x64", () => System.Runtime.InteropServices.Marshal.SizeOf<Native.INPUT>() == 40);
+            Check("Alt Tab remains available for approved app switching", () => !Guard.BlockSystemShortcut(0x09, true, false, false));
+            Check("Alt F4 remains blocked during kiosk", () => Guard.BlockSystemShortcut(0x73, true, false, false));
             var notepad = new AllowedApp { Name = "Notepad", Path = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "System32", "notepad.exe") };
             var packages = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "WindowsApps");
             Check("modern Notepad system redirect accepted", () => Policy.AllowedImage(notepad, Path.Combine(packages, "Microsoft.WindowsNotepad_11.0.0.0_x64__8wekyb3d8bbwe", "Notepad", "Notepad.exe")));
@@ -219,6 +221,8 @@ internal static class SelfTest
             Check("full-week coverage has no artificial opening deadline", () => SessionPolicy.CurrentWindow(continuous, sunday.AddHours(10)) is { End: null });
             Check("countdown clamps negative values", () => SessionPolicy.Countdown(TimeSpan.FromSeconds(-1)) == "00:00:00");
             Check("countdown supports more than 24 hours", () => SessionPolicy.Countdown(TimeSpan.FromHours(27) + TimeSpan.FromMinutes(8) + TimeSpan.FromSeconds(9)) == "27:08:09");
+            Check("floating kiosk indicator defaults off", () => !new Settings().ShowFloatingIndicator);
+            Check("invalid floating indicator position rejected", () => { try { FeaturePolicy.Validate(new Settings { FloatingIndicatorX = 1.1 }); return false; } catch (IOException) { return true; } });
             Check("invalid visual theme rejected", () => { try { AppearancePolicy.Validate(new KioskVisualSettings { Theme = "unknown" }); return false; } catch (IOException) { return true; } });
             Check("photo theme requires image selection", () => { try { AppearancePolicy.Validate(new KioskVisualSettings { Theme = "photo" }); return false; } catch (IOException) { return true; } });
             foreach (var theme in new[] { "lake", "desert", "mountainlake", "forest", "snow", "northern", "ocean", "tea", "mirrorlake", "moraine" })
@@ -234,8 +238,9 @@ internal static class SelfTest
             {
                 string imported = AppearancePolicy.ImportWallpaper(pngPath, wallpaperFolder);
                 Check("wallpaper import retains original and stores independent copy", () => File.Exists(pngPath) && File.Exists(imported) && !Policy.SamePath(pngPath, imported));
-                var design = Timetable(); design.Appearance = new KioskVisualSettings { Theme = "photo", BackgroundImagePath = imported, AnimationsEnabled = false, ShowCountdown = false }; design.AutoUnlockAtScheduleEnd = false; scheduledStore.Save(design);
+                var design = Timetable(); design.Appearance = new KioskVisualSettings { Theme = "photo", BackgroundImagePath = imported, AnimationsEnabled = false, ShowCountdown = false }; design.AutoUnlockAtScheduleEnd = false; design.ShowFloatingIndicator = true; design.FloatingIndicatorX = .23; design.FloatingIndicatorY = .67; scheduledStore.Save(design);
                 Check("appearance and automatic-opening preferences persist", () => { var loaded = scheduledStore.Load(); return loaded.Appearance.Theme == "photo" && !loaded.Appearance.AnimationsEnabled && !loaded.Appearance.ShowCountdown && !loaded.AutoUnlockAtScheduleEnd; });
+                Check("floating indicator preference and position persist", () => { var loaded = scheduledStore.Load(); return loaded.ShowFloatingIndicator && loaded.FloatingIndicatorX == .23 && loaded.FloatingIndicatorY == .67; });
             }
             finally { if (Directory.Exists(wallpaperFolder)) { foreach (var file in Directory.EnumerateFiles(wallpaperFolder)) File.Delete(file); Directory.Delete(wallpaperFolder); } }
             var invalidImage = Path.Combine(dir, "invalid.png"); File.WriteAllText(invalidImage, "not an image");

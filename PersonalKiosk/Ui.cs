@@ -177,7 +177,7 @@ internal sealed class PasswordPrompt
         var row = new StackPanel { Orientation = Orientation.Horizontal };
         row.Children.Add(Ui.Button("אישור", Verify, true)); row.Children.Add(Ui.Button("ביטול", () => w.DialogResult = false)); p.Children.Add(row);
         box.KeyDown += (_, e) => { if (e.Key == Key.Enter) { Verify(); e.Handled = true; } };
-        w.Content = new ScrollViewer { Content = p }; w.Loaded += (_, _) => box.Focus(); return w.ShowDialog() == true;
+        w.Content = new ScrollViewer { Content = p }; w.Loaded += (_, _) => box.Focus(); w.Activated += (_, _) => box.Focus(); return w.ShowDialog() == true;
     }
     internal static bool Set(Window owner, Settings settings, Store store)
     {
@@ -262,7 +262,7 @@ internal static class SettingsEditor
         var actions = new WrapPanel(); actions.Children.Add(Ui.Button("הוספת תוכנה", () => Edit(w, null, copy, Refresh)));
         actions.Children.Add(Ui.Button("זיהוי תוכנות מותקנות", () => { foreach (var app in Discovery.Find()) if (!copy.Apps.Any(a => Policy.SamePath(a.Path, app.Path))) copy.Apps.Add(app); Refresh(); })); p.Children.Add(actions);
         p.Children.Add(Ui.SettingRow("כונני USB", "הצגת כוננים נשלפים ודפדפן קבצים פשוט במסך הקיוסק.", Ui.Toggle(copy.UsbEnabled, value => copy.UsbEnabled = value)));
-        p.Children.Add(Ui.SettingRow("אישור פעולות רגישות", "דרישת סיסמה לקיצורי פעולות ולחלונות דו־שיח מזוהים.", Ui.Toggle(copy.GateDialogs, value => copy.GateDialogs = value)));
+        p.Children.Add(Ui.SettingRow("הגנת חלונות קבצים", "דרישת סיסמה לפני שימוש בחלונות פתיחה ושמירה מזוהים של תוכנות מאושרות.", Ui.Toggle(copy.GateDialogs, value => copy.GateDialogs = value)));
         p.Children.Add(Ui.Card(Ui.Text("הכיסוי אינו מלא: תפריטים פנימיים, שמירה אוטומטית, מסמכים אחרונים וקישורים בתוך תוכנה עשויים לפעול ללא אישור. אין בידוד של קבצים אישיים בחשבון הקיים.", 13, Ui.Muted)));
         TextBox? hintEditor = null;
         var extras = new StackPanel(); extras.Children.Add(Ui.Text("סיסמה ועדכונים", 25));

@@ -1,11 +1,11 @@
-# Release verification — PersonalKiosk 1.6.1
+# Release verification — PersonalKiosk 1.7.0
 
 Status: packaged release candidate; NOT certified for unrestricted distribution.
 
 ## Completed
 
 - Self-contained Windows x64 release build.
-- 159 automated checks pass. New checks load all ten embedded landscape backgrounds offline and verify that the former people-containing panorama is no longer embedded. Existing process-identity, session, password, file, scheduling, update, hint, wallpaper and 76-frame logo checks remain passing. Bar-Ilan discovery uses inert fixtures, not an installed copy.
+- 164 automated checks pass. New checks verify that Alt+Tab is permitted while Alt+F4 remains blocked, that the floating indicator defaults off, that invalid positions are rejected, and that its preference and position persist. Existing process-identity, session, password, file, scheduling, update, hint, wallpaper and 76-frame logo checks remain passing. Bar-Ilan discovery uses inert fixtures, not an installed copy.
 - The updater was checked against the real public GitHub API in the previous release. This release continues using the same bounded, read-only transport; no settings are sent by a probe.
 - The Fluent-style light/dark/warm kiosk layouts, primary action, 44×44 program icons, thin scrollbars, toggle rows, centered live-clock/countdown values, logo placements, schedule and appearance settings were rendered off-screen in WPF and visually inspected. This does not replace real-time animation and desktop interaction checks.
 - Runtime package vulnerability advisory lookup was unavailable because the NuGet service could not be reached. Compilation and local checks passed; no successful online vulnerability audit is claimed.
@@ -17,7 +17,9 @@ Status: packaged release candidate; NOT certified for unrestricted distribution.
 - [ ] Start live kiosk, reject wrong password, leave by correct password, restore minimized windows.
 - [ ] Open each installed app; check secondary/helper processes and packaged Notepad on the target OS.
 - [ ] Check keyboard hook installation and behavior with real keyboard input.
-- [ ] Check Ctrl+O/S/P/K and Shift variants in every allowed app.
+- [ ] Check Ctrl+S and the toolbar Save button in Word: neither should open a password prompt when saving an already-open file. Check that recognized Open/Save As dialogs still require a password when dialog protection is enabled.
+- [ ] Check Alt+Tab between two approved apps and verify an unapproved window is still minimized by the guard.
+- [ ] Enable the floating indicator, drag it on each DPI/monitor arrangement, restart the kiosk and verify its relative position is preserved.
 - [ ] Check menu actions, Word Backstage, recent files, existing documents, auto-save, links, drag/drop and embedded content; record bypasses rather than claim full coverage.
 - [ ] Connect/disconnect physical USB, test USB fixed disks and card readers, deny junction/symlink navigation.
 - [ ] Connect/disconnect monitors, mixed DPI, primary screen changes and approved app movement.

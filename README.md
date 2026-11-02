@@ -12,10 +12,10 @@ Requires Windows x64 and .NET SDK 10. Run `pwsh -File ./build.ps1` from this dir
 
 Outputs in `dist/`:
 
-- `PersonalKiosk-1.6.1-win-x64/PersonalKioskSetup.exe`: per-user installer. Installer mode is selected by this exact filename or `--install`.
+- `PersonalKiosk-1.7.0-win-x64/PersonalKioskSetup.exe`: per-user installer. Installer mode is selected by this exact filename or `--install`.
 - `app/PersonalKiosk.exe`: portable application.
-- `PersonalKiosk-1.6.1-win-x64.zip`: distribution candidate, guide, licenses, test results and checksums.
-- `PersonalKiosk-1.6.1-source.zip`: source-only archive, without settings or build output.
+- `PersonalKiosk-1.7.0-win-x64.zip`: distribution candidate, guide, licenses, test results and checksums.
+- `PersonalKiosk-1.7.0-source.zip`: source-only archive, without settings or build output.
 
 The portable executable must stay at the same path while the kiosk is active; the startup registration and watchdog refer to that path. Installation places it under `%LOCALAPPDATA%\Programs\PersonalKiosk`.
 
@@ -87,11 +87,18 @@ The built-in landscape selector now contains ten offline backgrounds, all visual
 - The password-change action is located in the **Password and updates** settings page.
 - Program cards on the home and kiosk dashboards use the executable's real icon, with the same safe fallback used by the settings list.
 
+## Version 1.7 interaction fixes
+
+- `Alt+Tab` is available for switching between approved applications. If an unapproved window is reached, the normal window guard still minimizes it and returns to the kiosk.
+- `Ctrl+S` and other in-app shortcuts are no longer intercepted merely because of their key combination. The optional password gate now acts on recognized dialogs themselves. This removes the inconsistent difference between a keyboard shortcut and an application's toolbar button, and avoids replaying a shortcut after a password prompt.
+- Activating an already-open approved application retries foreground restoration briefly instead of relying on one timing-sensitive call.
+- An optional, default-off 38-pixel translucent kiosk indicator can be shown on every monitor. It stays above approved applications, brightens on hover, is draggable, and stores one relative position for all monitors.
+
 ## Boundaries and release status
 
 This is a packaged release candidate, not a verified security boundary. Do not advertise complete personal-file protection or complete per-action authorization. Approved applications retain the Windows user's permissions; their internal UI and approved file dialogs can expose personal files. Ctrl+Alt+Delete, elevated Windows surfaces, arbitrary injected keyboard input, configuration tampering and shutdown/login gaps are outside the boundary.
 
-The owner explicitly chose same-account operation in exchange for weaker restriction. Dialog approval is based on common window classes, not comprehensive per-application integration. Some operations bypass it and some non-file dialogs trigger it. A shortcut approval can be handed to the same process's next recognized dialog for 3 seconds; the approved dialog remains usable until it closes.
+The owner explicitly chose same-account operation in exchange for weaker restriction. Dialog approval is based on common window classes, not comprehensive per-application integration. Some operations bypass it and some non-file dialogs trigger it. An approved dialog remains usable until it closes. Saving to an already-open file, autosave, printing and other internal application actions may happen without a password.
 
 Runtime notices are embedded and installed alongside the executable. The binary is unsigned. Full live acceptance, installer/uninstaller checks, physical USB, mixed-DPI multi-monitor, reboot/watchdog and app-specific workflows remain to be verified; see `RELEASE-CHECKLIST.md`. No startup or kiosk activation was performed on the owner's live desktop during development.
 

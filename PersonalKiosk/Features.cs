@@ -14,6 +14,7 @@ public static class FeaturePolicy
         AppearancePolicy.Validate(settings.Appearance);
         if (settings.PasswordHint == null || settings.PasswordHint.Length > 200) throw new IOException("רמז הסיסמה יכול להכיל עד 200 תווים.");
         if (settings.ScheduleWarningMinutes < 1 || settings.ScheduleWarningMinutes > 60) throw new IOException("ההתראה המוקדמת חייבת להיות בין דקה ל־60 דקות.");
+        if (!double.IsFinite(settings.FloatingIndicatorX) || !double.IsFinite(settings.FloatingIndicatorY) || settings.FloatingIndicatorX < 0 || settings.FloatingIndicatorX > 1 || settings.FloatingIndicatorY < 0 || settings.FloatingIndicatorY > 1) throw new IOException("מיקום סמל הקיוסק הצף אינו תקין.");
         foreach (var app in settings.Apps)
         {
             if (app.Availability == null || app.Availability.Any(w => w == null)) throw new IOException("טווחי הזמינות של התוכנה אינם תקינים.");

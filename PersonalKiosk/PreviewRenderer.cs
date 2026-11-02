@@ -28,7 +28,7 @@ internal static class PreviewRenderer
             var kiosk = new MainWindow(new Store(), sample, true); kiosk.RenderAt(now); var content = (UIElement)kiosk.Content; kiosk.Content = null;
             Save(content, Path.Combine(folder, "kiosk-" + theme + ".png"), 1200, 880); kiosk.Close();
         }
-        Save(new ScrollViewer { Content = AppearanceEditor.Create(owner, new Settings()) }, Path.Combine(folder, "appearance-settings.png"), 800, 900);
+        Save(new ScrollViewer { Content = AppearanceEditor.Create(owner, new Settings()) }, Path.Combine(folder, "appearance-settings.png"), 800, 1250);
         home.Close(); owner.Close();
     }
     private static void Save(UIElement content, string path, int width, int height)

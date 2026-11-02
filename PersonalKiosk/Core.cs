@@ -47,6 +47,9 @@ public sealed class Settings
     public KioskVisualSettings Appearance { get; set; } = new();
     public bool AutoUnlockAtScheduleEnd { get; set; } = true;
     public DateTime? SessionEndLocal { get; set; }
+    public bool ShowFloatingIndicator { get; set; }
+    public double FloatingIndicatorX { get; set; } = 0.02;
+    public double FloatingIndicatorY { get; set; } = 0.12;
 }
 
 public static class Passwords

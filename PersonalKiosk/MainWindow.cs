@@ -22,6 +22,7 @@ internal sealed class MainWindow : Window
     private Settings settings;
     private Guard? guard;
     private readonly List<Window> shields = new();
+    private readonly List<FloatingIndicator> floatingIndicators = new();
     private bool active, exiting, transition, prompting, sessionEnding;
     private string fault = "";
     private Rect normalBounds;
@@ -77,7 +78,7 @@ internal sealed class MainWindow : Window
         updateTimer.Tick += (_, _) => { _ = CheckUpdatesAsync(false); };
         SystemEvents.DisplaySettingsChanged += DisplaysChanged;
         SystemEvents.PowerModeChanged += PowerModeChanged;
-        Closed += (_, _) => { SystemEvents.DisplaySettingsChanged -= DisplaysChanged; SystemEvents.PowerModeChanged -= PowerModeChanged; clockTimer.Stop(); scheduleTimer.Stop(); updateTimer.Stop(); updateCancellation.Cancel(); noticeWindow?.Close(); tray?.Dispose(); guard?.Dispose(); CloseShields(); };
+        Closed += (_, _) => { SystemEvents.DisplaySettingsChanged -= DisplaysChanged; SystemEvents.PowerModeChanged -= PowerModeChanged; clockTimer.Stop(); scheduleTimer.Stop(); updateTimer.Stop(); updateCancellation.Cancel(); noticeWindow?.Close(); tray?.Dispose(); guard?.Dispose(); CloseFloatingIndicators(); CloseShields(); };
     }
     internal void Reload(Settings updated) { bool channelChanged = settings.IncludePrereleaseUpdates != updated.IncludePrereleaseUpdates; settings = updated; if (channelChanged) { lastUpdateAttempt = null; updateStatus = ""; } scheduleError = ""; UpdateResidentMode(); Build(); Dispatcher.BeginInvoke(MaintenanceTick); _ = CheckUpdatesAsync(false); }
     private void UpdateResidentMode()
@@ -248,7 +249,7 @@ internal sealed class MainWindow : Window
                 if (string.IsNullOrEmpty(settings.PasswordHash) && !PasswordPrompt.Set(this, settings, store)) return;
                 var consent = Ui.Dialog(this, "לפני הפעלת הקיוסק", 570, 450); var panel = new StackPanel { Margin = new Thickness(24) };
                 panel.Children.Add(Ui.Text("לפני שמתחילים", 27));
-                panel.Children.Add(Ui.Text("הקיוסק יפעל בחשבון הנוכחי. תוכנות מאושרות עשויות להגיע לקבצים אישיים ולבצע פעולות ללא סיסמה דרך ממשק פנימי. מסכי מערכת מאובטחים אינם נחסמים."));
+                panel.Children.Add(Ui.Text("הקיוסק יפעל בחשבון הנוכחי. תוכנות מאושרות עשויות להגיע לקבצים אישיים ולבצע פעולות ללא סיסמה דרך ממשק פנימי. הסיסמה מגינה על חלונות פתיחה ושמירה מזוהים, אך שמירה רגילה לקובץ שכבר פתוח אינה נחסמת. מסכי מערכת מאובטחים אינם נחסמים."));
                 panel.Children.Add(Ui.Text("תתווסף הפעלה אוטומטית בכניסה לחשבון. לאחר יציאה בסיסמה היא תישאר רק אם לוח הזמנים מופעל. חלונות אחרים ימוזערו ויוחזרו ביציאה. מסמכים לא ייסגרו.", 14, Ui.Muted));
                 panel.Children.Add(Ui.Text(settings.AutoUnlockAtScheduleEnd ? "בסוף רצף סדרים מתוזמן החסימה מסתיימת אוטומטית. יציאה מוקדמת או כניסה ידנית ללא זמן סיום דורשות סיסמה." : "ליציאה דרושה הסיסמה. אין שחזור סיסמה.", 15));
                 panel.Children.Add(Ui.Button("הפעלת הקיוסק", () => consent.DialogResult = true, true)); panel.Children.Add(Ui.Button("ביטול", () => consent.DialogResult = false)); consent.Content = new ScrollViewer { Content = panel };
@@ -262,6 +263,7 @@ internal sealed class MainWindow : Window
             RebuildScreens(); Build(); Home();
             guard = new Guard(settings, Home, Ask, GuardFault, Dispatcher) { ApprovedForeground = LowerShields };
             guard.Start();
+            RebuildFloatingIndicators();
             Startup.Launch(Environment.ProcessPath!, "--watch", Environment.ProcessId.ToString());
         }
         catch (Exception ex)
@@ -305,7 +307,7 @@ internal sealed class MainWindow : Window
             SessionPolicy.End(settings, DateTime.Now, automatic);
             try { store.Save(settings); }
             catch { settings.KioskActive = true; settings.SessionEndLocal = oldEnd; foreach (var (schedule, date) in previousDates) schedule.LastHandledDate = date; throw; }
-            guard?.Dispose(); guard = null; active = false; fault = ""; CloseShields();
+            guard?.Dispose(); guard = null; active = false; fault = ""; CloseFloatingIndicators(); CloseShields();
             if (automatic) CloseDialogs(this);
             Topmost = false; MinWidth = 760; MinHeight = 560; WindowStyle = WindowStyle.SingleBorderWindow; ResizeMode = ResizeMode.CanResize;
             Width = normalBounds.Width > 0 ? normalBounds.Width : 1060; Height = normalBounds.Height > 0 ? normalBounds.Height : 740;
@@ -333,7 +335,7 @@ internal sealed class MainWindow : Window
         }
         catch (Exception ex) { Home(); Ui.Message(this, "לא ניתן לפתוח", ex.Message); }
     }
-    private static bool ActivateExisting(AllowedApp app)
+    private bool ActivateExisting(AllowedApp app)
     {
         IntPtr candidate = IntPtr.Zero;
         Native.EnumWindows((hwnd, _) =>
@@ -343,8 +345,26 @@ internal sealed class MainWindow : Window
             candidate = hwnd; return false;
         }, IntPtr.Zero);
         if (candidate == IntPtr.Zero) return false;
-        if (Native.IsIconic(candidate)) Native.ShowWindow(candidate, 9);
-        Native.SetForegroundWindow(candidate); return true;
+        FocusExisting(candidate); return true;
+    }
+    private void FocusExisting(IntPtr hwnd)
+    {
+        int attempts = 0;
+        var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(120) };
+        void TryFocus()
+        {
+            if (!active || !Native.IsWindow(hwnd)) { timer.Stop(); return; }
+            LowerShields();
+            if (Native.IsIconic(hwnd)) Native.ShowWindow(hwnd, 9); else Native.ShowWindow(hwnd, 5);
+            Native.BringWindowToTop(hwnd);
+            Native.SetWindowPos(hwnd, IntPtr.Zero, 0, 0, 0, 0, 0x0043);
+            Native.SetForegroundWindow(hwnd);
+            attempts++;
+            if (Native.GetForegroundWindow() == hwnd || attempts >= 5) timer.Stop();
+        }
+        timer.Tick += (_, _) => TryFocus();
+        TryFocus();
+        if (Native.GetForegroundWindow() != hwnd) timer.Start();
     }
     private void GuardFault(string message) { fault = message; Build(); Home(); }
     private void Home()
@@ -356,6 +376,45 @@ internal sealed class MainWindow : Window
         if (!OwnedWindows.Cast<Window>().Any(w => w.IsVisible)) { Activate(); Native.SetForegroundWindow(new WindowInteropHelper(this).Handle); }
     }
     private void LowerShields() { if (!active) return; Topmost = false; foreach (var shield in shields) shield.Topmost = false; }
+    private void RebuildFloatingIndicators()
+    {
+        CloseFloatingIndicators();
+        if (!active || !settings.ShowFloatingIndicator) return;
+        foreach (var screen in Forms.Screen.AllScreens)
+        {
+            var indicator = new FloatingIndicator(FloatingIndicatorMoved);
+            indicator.Show();
+            PlaceFloatingIndicator(indicator, screen);
+            floatingIndicators.Add(indicator);
+        }
+    }
+    private void FloatingIndicatorMoved(FloatingIndicator indicator)
+    {
+        if (!Native.GetWindowRect(indicator.Handle, out var rect)) return;
+        var screen = Forms.Screen.FromHandle(indicator.Handle);
+        int availableWidth = Math.Max(1, screen.Bounds.Width - (rect.Right - rect.Left));
+        int availableHeight = Math.Max(1, screen.Bounds.Height - (rect.Bottom - rect.Top));
+        settings.FloatingIndicatorX = Math.Clamp((double)(rect.Left - screen.Bounds.Left) / availableWidth, 0, 1);
+        settings.FloatingIndicatorY = Math.Clamp((double)(rect.Top - screen.Bounds.Top) / availableHeight, 0, 1);
+        try { store.Save(settings); } catch { }
+        foreach (var item in floatingIndicators)
+        {
+            var target = Forms.Screen.FromHandle(item.Handle);
+            PlaceFloatingIndicator(item, target);
+        }
+    }
+    private void PlaceFloatingIndicator(FloatingIndicator indicator, Forms.Screen screen)
+    {
+        int width = 38, height = 38;
+        int x = screen.Bounds.Left + (int)Math.Round((screen.Bounds.Width - width) * settings.FloatingIndicatorX);
+        int y = screen.Bounds.Top + (int)Math.Round((screen.Bounds.Height - height) * settings.FloatingIndicatorY);
+        Native.SetWindowPos(indicator.Handle, new IntPtr(-1), x, y, width, height, 0x0050);
+    }
+    private void CloseFloatingIndicators()
+    {
+        foreach (var indicator in floatingIndicators.ToArray()) indicator.Close();
+        floatingIndicators.Clear();
+    }
     private void RebuildScreens()
     {
         CloseShields();
@@ -392,7 +451,7 @@ internal sealed class MainWindow : Window
         if (!Native.SetWindowPos(new WindowInteropHelper(window).Handle, IntPtr.Zero, bounds.Left, bounds.Top, bounds.Width, bounds.Height, 0x0014)) throw new IOException("לא ניתן לכסות את כל שטח המסך.");
     }
     private void CloseShields() { var wasExiting = exiting; exiting = true; foreach (var w in shields.ToArray()) w.Close(); shields.Clear(); secondaryClocks.Clear(); exiting = wasExiting; }
-    private void DisplaysChanged(object? sender, EventArgs e) => Dispatcher.BeginInvoke(() => { if (active) { RebuildScreens(); Home(); } });
+    private void DisplaysChanged(object? sender, EventArgs e) => Dispatcher.BeginInvoke(() => { if (active) { RebuildScreens(); RebuildFloatingIndicators(); Home(); } });
     private void PowerModeChanged(object sender, PowerModeChangedEventArgs e)
     {
         if (e.Mode != PowerModes.Resume) return;
@@ -400,7 +459,7 @@ internal sealed class MainWindow : Window
         {
             if (exiting || sessionEnding) return;
             TryAutomaticExit();
-            if (active) { RebuildScreens(); guard?.Refresh(); Build(); Home(); }
+            if (active) { RebuildScreens(); RebuildFloatingIndicators(); guard?.Refresh(); Build(); Home(); }
             MaintenanceTick();
         });
     }
@@ -416,5 +475,5 @@ internal sealed class MainWindow : Window
         if (active && !exiting && !sessionEnding) { e.Cancel = true; if (!transition) Exit(); }
         else if (!exiting && !sessionEnding && SchedulePolicy.HasSchedule(settings)) { e.Cancel = true; ShowInTaskbar = false; Hide(); }
     }
-    private void Help() => Ui.Message(this, "מידע ועזרה", "קיוסק אישי " + BuildInfo.Version + "\n\nחזרה למסך הבית: Ctrl + Alt + Home. יציאה מוקדמת ושינוי הגדרות מחייבים סיסמה.\n\nבלשונית לוח זמנים מגדירים ימים ושעות לסדרים. התוכנה נשארת ברקע, והקיוסק מופעל בתוך טווח הסדר. יציאה בסיסמה מדלגת על שאר הסדר הנוכחי. כברירת מחדל החסימה מסתיימת בסוף רצף הסדרים. ניתן לשנות זאת בלשונית עיצוב המסך. המחשב חייב להיות ער והחשבון מחובר.\n\nהחסימה מיועדת לשימוש מזדמן. אין בידוד קבצים בחשבון הקיים. Ctrl+Alt+Delete, הרשאות מנהל ומסכי Windows מאובטחים אינם נחסמים.\n\nנדרשת סיסמה לקיצורי Ctrl+O/S/P/K ולחלונות מזוהים, אך לא לכל פעולה פנימית. אישור חלון מאפשר להשתמש בו עד סגירתו, לרבות ניווט במחשב. אין אפשרות לשחזר סיסמה.\n\nאין סינון אינטרנט. מסמכים שכבר פתוחים נשארים פתוחים. כונני USB מזוהים לפי סוג החיבור; קוראי כרטיסים ומתאמים מסוימים עשויים להופיע כ־USB.\n\nמומלץ לשמור מסמכים אישיים ולסגור אותם לפני השימוש. מדריך מלא מצורף לחבילה.");
+    private void Help() => Ui.Message(this, "מידע ועזרה", "קיוסק אישי " + BuildInfo.Version + "\n\nחזרה למסך הבית: Ctrl + Alt + Home. ניתן לעבור בין תוכנות מאושרות באמצעות Alt+Tab. יציאה מוקדמת ושינוי הגדרות מחייבים סיסמה.\n\nבלשונית לוח זמנים מגדירים ימים ושעות לסדרים. התוכנה נשארת ברקע, והקיוסק מופעל בתוך טווח הסדר. יציאה בסיסמה מדלגת על שאר הסדר הנוכחי. כברירת מחדל החסימה מסתיימת בסוף רצף הסדרים. ניתן לשנות זאת בלשונית עיצוב המסך. המחשב חייב להיות ער והחשבון מחובר.\n\nהחסימה מיועדת לשימוש מזדמן. אין בידוד קבצים בחשבון הקיים. Ctrl+Alt+Delete, הרשאות מנהל ומסכי Windows מאובטחים אינם נחסמים.\n\nהגנת הפעולות מבקשת סיסמה לפני חלונות פתיחה ושמירה מזוהים. שמירה רגילה לקובץ שכבר פתוח, הדפסה ופעולות פנימיות אחרות עשויות להתבצע ללא סיסמה. אישור חלון מאפשר להשתמש בו עד סגירתו, לרבות ניווט במחשב. אין אפשרות לשחזר סיסמה.\n\nאין סינון אינטרנט. מסמכים שכבר פתוחים נשארים פתוחים. כונני USB מזוהים לפי סוג החיבור; קוראי כרטיסים ומתאמים מסוימים עשויים להופיע כ־USB.\n\nמומלץ לשמור מסמכים אישיים ולסגור אותם לפני השימוש. מדריך מלא מצורף לחבילה.");
 }
